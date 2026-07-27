@@ -65,16 +65,16 @@ It listens on `127.0.0.1:8765` locally.
   Availability Zone: ap-northeast-1a
   Bundle: small_3_0
   Blueprint: ubuntu_24_04
-  Original ephemeral public IPv4: 54.248.1.53
-  Private IPv4: 172.26.6.108
-  Public IPv6: 2406:da14:15da:6e00:c54d:bcab:e93f:934c
+  Original ephemeral public IPv4: <ORIGINAL_EPHEMERAL_PUBLIC_IPV4>
+  Private IPv4: <LIGHTSAIL_PRIVATE_IPV4>
+  Public IPv6: <LIGHTSAIL_PUBLIC_IPV6>
   SSH username: ubuntu
   ```
 
 - Static IP `ubuntu-1-tokyo-static-ip` is attached to `Ubuntu-1`.
-- Current static public IPv4: `13.196.4.191`.
+- Current static public IPv4: `<LIGHTSAIL_PUBLIC_IPV4>`.
 - The instance uses the Tokyo Lightsail default SSH key. Its private key is
-  stored only at `/Users/a11/.ssh/aws-lightsail-tokyo-default.pem` with mode
+  stored only at `<LOCAL_LIGHTSAIL_SSH_KEY_PATH>` with mode
   `600`; never print, copy, commit, or upload its contents.
 - Automatic snapshots are disabled.
 - The instance now incurs the approved USD 12/month Lightsail charge while it
@@ -121,7 +121,7 @@ It listens on `127.0.0.1:8765` locally.
 - Local launcher `连接云端监控.command` creates an SSH tunnel from
   `127.0.0.1:18765` to the remote app and opens it in the browser.
 - Alibaba Cloud DNS has enabled A records for both the root and `www` hostnames
-  of `chopsticktrip.com` and `sheshetrip.fun`, all pointing to `13.196.4.191`.
+  of `chopsticktrip.com` and `sheshetrip.fun`, all pointing to `<LIGHTSAIL_PUBLIC_IPV4>`.
 - Caddy is installed, enabled, and active.
 - `chopsticktrip.com` and `www.chopsticktrip.com` intentionally return an empty
   HTTP 200 response over HTTPS; do not deploy the monitor there.

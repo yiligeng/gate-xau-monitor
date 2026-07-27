@@ -76,12 +76,12 @@ aws configure list-profiles
 - 套餐：`small_3_0`，USD 12/月
 - 配置：2 GB RAM、2 vCPU、60 GB SSD、3 TB 月流量
 - 网络：Dual-stack（IPv4 + IPv6）
-- 静态公网 IPv4：`13.196.4.191`
-- 公网 IPv6：`2406:da14:15da:6e00:c54d:bcab:e93f:934c`
-- 私网 IPv4：`172.26.6.108`
+- 静态公网 IPv4：`<LIGHTSAIL_PUBLIC_IPV4>`
+- 公网 IPv6：`<LIGHTSAIL_PUBLIC_IPV6>`
+- 私网 IPv4：`<LIGHTSAIL_PRIVATE_IPV4>`
 - SSH 用户名：`ubuntu`
 - SSH 密钥：东京区域的 Lightsail 默认密钥，本机安全路径
-  `/Users/a11/.ssh/aws-lightsail-tokyo-default.pem`（权限 `600`）
+  `<LOCAL_LIGHTSAIL_SSH_KEY_PATH>`（权限 `600`）
 - 自动快照：未启用
 - 静态 IP 资源：`ubuntu-1-tokyo-static-ip`，已绑定
 - 部署目录：`/opt/xau-monitor`
@@ -109,7 +109,7 @@ AWS CLI 用于管理实例、网络、快照等云资源；登录服务器和执
 命令使用 SSH。下载东京区域的默认私钥后，可使用：
 
 ```bash
-ssh -i /Users/a11/.ssh/aws-lightsail-tokyo-default.pem ubuntu@13.196.4.191
+ssh -i <LOCAL_LIGHTSAIL_SSH_KEY_PATH> ubuntu@<LIGHTSAIL_PUBLIC_IPV4>
 ```
 
 私钥不得复制到项目、Git、聊天或云盘。
@@ -136,8 +136,8 @@ https://sheshetrip.fun
 阿里云 DNS 已为 `sheshetrip.fun` 配置：
 
 ```text
-@    A    13.196.4.191
-www  A    13.196.4.191
+@    A    <LIGHTSAIL_PUBLIC_IPV4>
+www  A    <LIGHTSAIL_PUBLIC_IPV4>
 ```
 
 `chopsticktrip.com` 的 DNS 也仍指向同一静态 IP，但 Caddy 对其根域名和
@@ -160,7 +160,7 @@ Caddy 配置位于服务器：
 检查服务：
 
 ```bash
-ssh -i /Users/a11/.ssh/aws-lightsail-tokyo-default.pem ubuntu@13.196.4.191 \
+ssh -i <LOCAL_LIGHTSAIL_SSH_KEY_PATH> ubuntu@<LIGHTSAIL_PUBLIC_IPV4> \
   'systemctl status caddy xau-monitor --no-pager'
 ```
 

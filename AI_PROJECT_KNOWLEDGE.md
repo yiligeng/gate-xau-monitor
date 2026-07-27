@@ -87,8 +87,8 @@ flowchart LR
 - CPU：2 vCPU
 - 内存：2 GB
 - SSD：60 GB
-- 静态公网 IPv4：`13.196.4.191`
-- 私网 IPv4：`172.26.6.108`
+- 静态公网 IPv4：`<LIGHTSAIL_PUBLIC_IPV4>`
+- 私网 IPv4：`<LIGHTSAIL_PRIVATE_IPV4>`
 - 生产目录：`/opt/xau-monitor`
 - 固定费用：USD 12/月，未含税
 - Lightsail 自动快照：关闭
@@ -103,7 +103,7 @@ flowchart LR
 - `chopsticktrip.com`：保留空白站点，HTTPS 返回空 HTTP 200
 - `www.chopsticktrip.com`：同上
 
-阿里云 DNS 的 A 记录指向 `13.196.4.191`。HTTPS 证书由 Caddy 自动申请
+阿里云 DNS 的 A 记录指向 `<LIGHTSAIL_PUBLIC_IPV4>`。HTTPS 证书由 Caddy 自动申请
 和续期，不单独购买证书。
 
 ### Caddy
@@ -465,7 +465,7 @@ git diff --check
 
 禁止：
 
-- 不要把 `/Users/a11/.ssh/aws-lightsail-tokyo-default.pem` 放入 GitHub
+- 不要把 `<LOCAL_LIGHTSAIL_SSH_KEY_PATH>` 放入 GitHub
   Secrets。
 - 不要让 GitHub-hosted runner 直接 SSH 到生产服务器。
 - 不要把 `Deploy Production` 改成 `push` 自动触发，除非 GitHub 环境审批
@@ -480,8 +480,8 @@ git diff --check
 
 ```bash
 rsync -az --omit-dir-times \
-  -e "ssh -i /Users/a11/.ssh/aws-lightsail-tokyo-default.pem" \
-  src/ ubuntu@13.196.4.191:/opt/xau-monitor/src/
+  -e "ssh -i <LOCAL_LIGHTSAIL_SSH_KEY_PATH>" \
+  src/ ubuntu@<LIGHTSAIL_PUBLIC_IPV4>:/opt/xau-monitor/src/
 ```
 
 数据库迁移和其他文件按明确路径同步。不要使用 `rsync --delete`，除非已经
@@ -545,8 +545,8 @@ SSH：
 
 ```bash
 ssh \
-  -i /Users/a11/.ssh/aws-lightsail-tokyo-default.pem \
-  ubuntu@13.196.4.191
+  -i <LOCAL_LIGHTSAIL_SSH_KEY_PATH> \
+  ubuntu@<LIGHTSAIL_PUBLIC_IPV4>
 ```
 
 SSH 私钥只允许保存在该路径，权限应为 600。不得显示、复制、上传或提交。

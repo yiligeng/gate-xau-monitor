@@ -2,12 +2,21 @@
 
 set -e
 
-key_path="/Users/a11/.ssh/aws-lightsail-tokyo-default.pem"
-remote_host="13.196.4.191"
+key_path="${LIGHTSAIL_SSH_KEY_PATH:-}"
+remote_host="${LIGHTSAIL_REMOTE_HOST:-}"
 local_port="18765"
 
+if [[ -z "$key_path" || -z "$remote_host" ]]; then
+  echo "请先在本机设置 LIGHTSAIL_SSH_KEY_PATH 和 LIGHTSAIL_REMOTE_HOST。"
+  echo "示例："
+  echo "export LIGHTSAIL_SSH_KEY_PATH=\"/path/to/key.pem\""
+  echo "export LIGHTSAIL_REMOTE_HOST=\"your.server.example\""
+  read -k 1 "?按任意键退出..."
+  exit 1
+fi
+
 if [[ ! -f "$key_path" ]]; then
-  echo "找不到 Lightsail SSH 密钥：$key_path"
+  echo "找不到 Lightsail SSH 密钥。请检查 LIGHTSAIL_SSH_KEY_PATH。"
   read -k 1 "?按任意键退出..."
   exit 1
 fi

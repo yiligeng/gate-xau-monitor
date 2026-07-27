@@ -452,6 +452,46 @@ git diff --check
 - 固定脚本源模板：`ops/deploy-xau-monitor`。服务器上的实际脚本必须由
   root 拥有，不应由普通 deploy workflow 自动覆盖。
 
+### 代码上传 vs 生产发布原理
+
+给后续维护者和 AI 的速读结论：
+
+- `git push` 只把代码上传到 GitHub private repo，不会发布生产。
+- 发布生产只发生在 GitHub Actions 页面手动运行 `Deploy Production` 后。
+- 触发后不是 GitHub SSH 进服务器；而是 Lightsail 上的 self-hosted runner
+  主动连接 GitHub 领取任务。
+- GitHub 不持有生产 SSH 私钥、数据库 URL、企微 Secret、AWS 凭据。
+- runner 领取任务后只读 checkout 当前 `main` 代码，先跑测试，再通过 sudo 调用
+  服务器本机 root-owned 固定脚本部署。
+- `Run workflow` 是当前 GitHub plan 下的人工批准点；不要把 deploy 改成 push
+  自动触发。
+
+```mermaid
+flowchart LR
+  M["Mac"] -->|"git push"| G["GitHub private repo"]
+  U["Owner clicks Run workflow"] --> G
+  R["Lightsail self-hosted runner"] -->|"polls GitHub for jobs"| G
+  G -->|"read-only checkout task"| R
+  R -->|"tests pass"| D["sudo /usr/local/sbin/deploy-xau-monitor"]
+  D -->|"sync allowlisted project files"| P["/opt/xau-monitor"]
+  D -->|"restart"| S["xau-monitor + xau-monitor-wecom-bot"]
+  S -->|"runtime only"| E["/etc/xau-monitor/*.env"]
+```
+
+安全边界：
+
+- GitHub 能看到：仓库代码、workflow 文件、runner 名称、commit SHA、非敏感部署
+  日志。
+- GitHub 不应看到：SSH 私钥、数据库连接串、企微 Secret、AWS access key、登录
+  密码、session cookie。
+- 有生产发布能力的人：能写入 `main` 并能手动触发 `Deploy Production` 的 GitHub
+  账号。因此仓库权限、GitHub 账号 2FA、协作者数量是主要风险控制点。
+- 如果恶意代码进入 `main` 并被人工部署，代码在生产进程内可能读取生产环境变量。
+  所以发布前必须确认 diff 和 CI 结果。
+- 旧 Actions 日志和 Git 历史可能曾出现公网 IP 或本机路径等运维指纹；当前版本已
+  用 `<LIGHTSAIL_PUBLIC_IPV4>`、`<LOCAL_LIGHTSAIL_SSH_KEY_PATH>` 等占位符脱敏。
+  若需要从历史中彻底删除，必须单独执行 Git 历史重写和远端日志清理。
+
 部署脚本逻辑：
 
 1. 只接受 GitHub Actions runner workspace 作为源目录。
@@ -474,9 +514,10 @@ git diff --check
   主要依赖 deploy workflow 手动触发和服务器固定脚本。
 - 不要给 self-hosted runner 用户 unrestricted sudo。
 
-### 代码同步
+### 旧手动 SSH/rsync 同步（应急）
 
-项目当前没有成熟的 Git 发布流程，实际使用 SSH/rsync：
+项目当前主发布流程是 `Deploy Production` GitHub Actions。SSH/rsync 只作为
+GitHub Actions 或 runner 故障时的应急方案，使用前必须先确认目标路径和 diff。
 
 ```bash
 rsync -az --omit-dir-times \

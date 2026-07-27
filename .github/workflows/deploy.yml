@@ -17,6 +17,9 @@ jobs:
       - self-hosted
       - xau-monitor
       - production
+    env:
+      # Avoid probing restricted sbin paths during GitHub action cleanup.
+      PATH: /usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin
     timeout-minutes: 20
     steps:
       # actions/checkout v7.0.1 pinned 2026-07-28.

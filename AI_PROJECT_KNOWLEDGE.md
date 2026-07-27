@@ -441,7 +441,9 @@ git diff --check
 - `Deploy Production`：只允许在 GitHub Actions 页面手动
   `Run workflow`，且必须从 `main` 分支运行。
 - GitHub 当前 plan 不支持 private repo 的 `production` environment required
-  reviewers；不要改成 `main` push 自动部署，否则会绕过人工批准。
+  reviewers，也不支持 private repo branch protection。不要改成 `main` push
+  自动部署，否则会绕过人工批准。若未来升级 GitHub Pro，可再开启
+  required reviewers、branch protection 和 required status checks。
 - 生产部署跑在 Lightsail self-hosted runner，标签为
   `self-hosted`, `xau-monitor`, `production`。
 - GitHub 不保存服务器 SSH 私钥、数据库 URL、企微 Secret 或 AWS 凭据。
@@ -468,6 +470,8 @@ git diff --check
 - 不要让 GitHub-hosted runner 直接 SSH 到生产服务器。
 - 不要把 `Deploy Production` 改成 `push` 自动触发，除非 GitHub 环境审批
   保护规则已经可用并验证生效。
+- 在当前 GitHub plan 下，`main` 分支不能被 GitHub 强制保护；生产安全边界
+  主要依赖 deploy workflow 手动触发和服务器固定脚本。
 - 不要给 self-hosted runner 用户 unrestricted sudo。
 
 ### 代码同步

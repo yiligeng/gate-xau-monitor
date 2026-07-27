@@ -53,6 +53,8 @@ GitHub 私有仓库已配置为适合生产审批式部署：
 - 生产部署只在 GitHub Actions 页面手动运行 `Deploy Production`。
 - 手动运行后由 Lightsail 上的 self-hosted runner 执行固定部署脚本。
 - GitHub 不保存服务器 SSH 私钥、数据库连接串或企微 Secret。
+- 当前 GitHub plan 不支持 private repo 的环境审批和分支保护，所以不要把
+  deploy workflow 改成 `main` 自动触发。
 
 服务器实际部署脚本模板在 `ops/deploy-xau-monitor`。
 

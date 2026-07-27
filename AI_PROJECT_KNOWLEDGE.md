@@ -492,6 +492,21 @@ flowchart LR
   用 `<LIGHTSAIL_PUBLIC_IPV4>`、`<LOCAL_LIGHTSAIL_SSH_KEY_PATH>` 等占位符脱敏。
   若需要从历史中彻底删除，必须单独执行 Git 历史重写和远端日志清理。
 
+团队开放前待办（当前暂停，等实际邀请团队成员时再做）：
+
+- 只给普通成员 pull/triage 或开 PR 权限；不要给 direct push `main` 权限。
+- 优先升级到支持 private repo branch protection 的 GitHub plan，然后开启
+  protected `main`、required PR review、required CI checks、restrict direct
+  pushes。
+- 增加 `CODEOWNERS`，至少要求 owner 审批 `.github/workflows/**`、`ops/**`、
+  `aws/**`、`db/migrations/**`、认证和企微机器人相关代码。
+- 如果 GitHub plan 支持 environments，在 `Deploy Production` 上开启
+  `production` environment required reviewers，并禁止 self-review。
+- 团队开放后，self-hosted runner 仍然只跑 `Deploy Production`；不要让它执行
+  来自 fork 或未信任 PR 的任意代码。
+- 定期复核 collaborator 列表、GitHub 2FA、workflow 权限和 Actions 日志，确认
+  没有新增 secret、公网 IP、本机路径或过宽权限。
+
 部署脚本逻辑：
 
 1. 只接受 GitHub Actions runner workspace 作为源目录。

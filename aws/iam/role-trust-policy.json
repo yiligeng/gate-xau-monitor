@@ -1,0 +1,13 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::960170157901:user/xau-deploy-cli"
+      },
+      "Action": "sts:AssumeRole"
+    }
+  ]
+}
+

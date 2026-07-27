@@ -1,0 +1,28 @@
+[Unit]
+Description=Gate XAUUSD / BTCUSDT WeCom Bot
+Wants=network-online.target
+After=network-online.target xau-monitor.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/xau-monitor
+Environment=PYTHONUNBUFFERED=1
+EnvironmentFile=-/etc/xau-monitor/database.env
+EnvironmentFile=/etc/xau-monitor/wecom-bot.env
+ExecStart=/opt/xau-monitor/.venv/bin/xau-monitor --wecom-bot
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gate-xau-monitor"
+version = "0.1.0"
+description = "Gate TradFi XAUUSD CFD real-time market monitor"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "psycopg[binary]>=3.2,<4",
+]
+
+[project.optional-dependencies]
+wecom = [
+    "wecom-aibot-python-sdk>=1.0,<2",
+]
+
+[project.scripts]
+xau-monitor = "xau_monitor.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+xau_monitor = ["web_static/*"]

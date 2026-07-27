@@ -1,0 +1,13 @@
+[profile xau-cli-base]
+region = ap-northeast-1
+output = json
+
+[profile xau-lightsail]
+role_arn = arn:aws:iam::960170157901:role/XauMonitorDeployRole
+source_profile = xau-cli-base
+region = ap-northeast-1
+output = json
+
+# Access Key 和 Secret Key 只能由 AWS CLI 写入 ~/.aws/credentials。
+# 不要将凭证写入本文件。
+

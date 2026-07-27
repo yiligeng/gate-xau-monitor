@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0b0d0f">
+    <title>Gate 黄金行情监控</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div class="brand">
+          <div class="gold-mark" aria-hidden="true">Au</div>
+          <div>
+            <p class="eyebrow">GATE TRADFI · LIVE CFD</p>
+            <h1>XAUUSD 黄金监控</h1>
+          </div>
+        </div>
+        <div class="connection">
+          <span id="frequency-badge" class="frequency-badge">HIGH-FREQ · -- Hz</span>
+          <span class="status-dot"></span>
+          <span id="market-status">正在连接</span>
+          <time id="updated-time">--:--:--</time>
+        </div>
+      </header>
+
+      <section class="hero-grid">
+        <article class="price-panel card">
+          <div class="price-heading">
+            <span>实时价格</span>
+            <div class="price-meta">
+              <span id="feed-latency">延迟 -- ms</span>
+              <span id="day-change" class="change neutral">--</span>
+            </div>
+          </div>
+          <div id="last-price" class="last-price">----.--</div>
+          <div class="quote-row">
+            <div><span>买价</span><strong id="bid-price">--</strong></div>
+            <div><span>卖价</span><strong id="ask-price">--</strong></div>
+            <div><span>点差</span><strong id="spread">--</strong></div>
+          </div>
+          <div class="range-track">
+            <div id="range-fill" class="range-fill"></div>
+            <div id="range-pin" class="range-pin"></div>
+          </div>
+          <div class="range-labels">
+            <span>低 <strong id="day-low">--</strong></span>
+            <span>高 <strong id="day-high">--</strong></span>
+          </div>
+        </article>
+
+        <article class="bias-panel card">
+          <p class="panel-label">多周期综合结构</p>
+          <div class="bias-content">
+            <div id="bias-orb" class="bias-orb neutral">
+              <span id="overall-bias">等待</span>
+              <small id="overall-score">0</small>
+            </div>
+            <div class="bias-copy">
+              <strong id="bias-title">行情数据初始化中</strong>
+              <p id="bias-detail">系统将组合1分钟、5分钟和15分钟趋势。</p>
+            </div>
+          </div>
+          <div id="alert-line" class="alert-line">等待实时提示…</div>
+        </article>
+      </section>
+
+      <section class="chart-card card">
+        <div class="section-heading">
+          <div>
+            <p class="panel-label">PRICE ACTION</p>
+            <h2 id="chart-title">1分钟 K线</h2>
+          </div>
+          <div class="chart-tools">
+            <div class="chart-switch" role="group" aria-label="图表周期">
+              <button class="chart-mode" data-mode="tick">Tick</button>
+              <button class="chart-mode active" data-mode="1m">1分钟</button>
+              <button class="chart-mode" data-mode="5m">5分钟</button>
+            </div>
+            <div class="legend" aria-label="图例">
+              <span><i class="up"></i>上涨</span>
+              <span><i class="down"></i>下跌</span>
+              <span><i class="ema"></i>EMA200</span>
+            </div>
+          </div>
+        </div>
+        <div class="strategy-bar">
+          <div class="strategy-head">
+            <label class="master-toggle">
+              <input id="strategy-master" type="checkbox" checked>
+              <span class="switch-track"></span>
+              <strong>组合策略</strong>
+            </label>
+            <div id="strategy-result" class="strategy-result neutral">
+              <strong id="strategy-bias">计算中</strong>
+              <span id="strategy-score">--</span>
+            </div>
+          </div>
+          <div class="indicator-toggles" role="group" aria-label="组合指标开关">
+            <label><input type="checkbox" data-indicator="ema200" checked><i class="indicator-color ema200"></i>EMA200</label>
+            <label><input type="checkbox" data-indicator="bollinger" checked><i class="indicator-color bollinger"></i>布林通道</label>
+            <label><input type="checkbox" data-indicator="atr"><i class="indicator-color atr"></i>ATR通道</label>
+            <label><input type="checkbox" data-indicator="psar" checked><i class="indicator-color psar"></i>PSAR</label>
+            <label><input type="checkbox" data-indicator="pivots" checked><i class="indicator-color pivots"></i>日枢轴</label>
+          </div>
+          <p id="strategy-detail" class="strategy-detail">等待足够行情数据计算组合方向。</p>
+        </div>
+        <div class="chart-wrap">
+          <canvas id="price-chart" aria-label="XAUUSD实时行情图"></canvas>
+          <div id="chart-empty" class="chart-empty">正在积累Tick数据…</div>
+        </div>
+      </section>
+
+      <section class="metrics-grid" id="frames"></section>
+
+      <section class="bottom-grid">
+        <article class="levels-card card">
+          <div class="section-heading compact">
+            <div>
+              <p class="panel-label">KEY LEVELS</p>
+              <h2>短线关键位</h2>
+            </div>
+          </div>
+          <div class="level-row resistance">
+            <span>近端阻力</span><strong id="resistance">--</strong>
+          </div>
+          <div class="level-row current">
+            <span>当前价格</span><strong id="level-current">--</strong>
+          </div>
+          <div class="level-row support">
+            <span>近端支撑</span><strong id="support">--</strong>
+          </div>
+        </article>
+
+        <article class="notes-card card">
+          <div class="section-heading compact">
+            <div>
+              <p class="panel-label">LIVE NOTES</p>
+              <h2>当前提示</h2>
+            </div>
+          </div>
+          <ul id="plan-list">
+            <li>正在获取 Gate 实时数据…</li>
+          </ul>
+          <p class="disclaimer">只读行情监控，不会下单。指标仅描述市场结构，不构成投资建议。</p>
+        </article>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>

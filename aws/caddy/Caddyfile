@@ -1,0 +1,25 @@
+chopsticktrip.com, www.chopsticktrip.com {
+	respond "" 200
+}
+
+sheshetrip.fun, www.sheshetrip.fun {
+	request_body {
+		max_size 32KB
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	log {
+		output file /var/log/caddy/sheshetrip-access.log {
+			roll_size 10MiB
+			roll_keep 5
+			roll_keep_for 168h
+		}
+		format json
+	}
+	reverse_proxy 127.0.0.1:8765
+}

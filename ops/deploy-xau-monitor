@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+umask 022
+
+if [[ "${EUID}" -ne 0 ]]; then
+  echo "deploy-xau-monitor must run as root." >&2
+  exit 1
+fi
+
+source_dir="${1:-}"
+commit_sha="${2:-unknown}"
+runner_work_root="/opt/actions-runner/gate-xau-monitor/_work"
+app_dir="/opt/xau-monitor"
+backup_dir="/var/backups/xau-monitor-deploy"
+lock_file="/run/xau-monitor-deploy.lock"
+
+if [[ -z "${source_dir}" || ! -d "${source_dir}" ]]; then
+  echo "Missing GitHub Actions workspace path." >&2
+  exit 1
+fi
+
+resolved_source="$(realpath "${source_dir}")"
+case "${resolved_source}" in
+  "${runner_work_root}"/*) ;;
+  *)
+    echo "Refusing to deploy from outside ${runner_work_root}." >&2
+    exit 1
+    ;;
+esac
+
+if [[ ! "${commit_sha}" =~ ^[0-9a-f]{40}$ ]]; then
+  echo "Invalid commit SHA." >&2
+  exit 1
+fi
+
+test -f "${resolved_source}/pyproject.toml"
+test -d "${resolved_source}/src/xau_monitor"
+test -d "${resolved_source}/db/migrations"
+
+exec 9>"${lock_file}"
+if ! flock -n 9; then
+  echo "Another deployment is already running." >&2
+  exit 1
+fi
+
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+install -d -o root -g root -m 0750 "${backup_dir}"
+backup_path="${backup_dir}/xau-monitor-${timestamp}-${commit_sha:0:12}.tar.gz"
+
+tar \
+  --exclude='.venv' \
+  --exclude='__pycache__' \
+  --exclude='*.pyc' \
+  -C /opt \
+  -czf "${backup_path}" \
+  xau-monitor/src \
+  xau-monitor/db \
+  xau-monitor/aws \
+  xau-monitor/pyproject.toml \
+  xau-monitor/README.md \
+  xau-monitor/AI_PROJECT_KNOWLEDGE.md \
+  xau-monitor/AGENTS.md
+
+find "${backup_dir}" -type f -name 'xau-monitor-*.tar.gz' -mtime +14 -delete
+
+rsync -a --delete --exclude='__pycache__' "${resolved_source}/src/" "${app_dir}/src/"
+rsync -a --delete "${resolved_source}/db/" "${app_dir}/db/"
+rsync -a --delete "${resolved_source}/aws/" "${app_dir}/aws/"
+install -o ubuntu -g ubuntu -m 0644 "${resolved_source}/pyproject.toml" "${app_dir}/pyproject.toml"
+install -o ubuntu -g ubuntu -m 0644 "${resolved_source}/README.md" "${app_dir}/README.md"
+install -o ubuntu -g ubuntu -m 0644 "${resolved_source}/AI_PROJECT_KNOWLEDGE.md" "${app_dir}/AI_PROJECT_KNOWLEDGE.md"
+install -o ubuntu -g ubuntu -m 0644 "${resolved_source}/AGENTS.md" "${app_dir}/AGENTS.md"
+chown -R ubuntu:ubuntu "${app_dir}/src" "${app_dir}/db" "${app_dir}/aws"
+
+runuser -u ubuntu -- \
+  "${app_dir}/.venv/bin/python" -m pip install -e "${app_dir}[wecom]"
+
+"${app_dir}/aws/postgresql/bootstrap-local"
+systemctl restart xau-monitor xau-monitor-wecom-bot
+systemctl is-active --quiet xau-monitor
+systemctl is-active --quiet xau-monitor-wecom-bot
+curl --fail --silent --show-error --max-time 5 http://127.0.0.1:8765/login >/dev/null
+
+echo "Deployed ${commit_sha} to ${app_dir}."

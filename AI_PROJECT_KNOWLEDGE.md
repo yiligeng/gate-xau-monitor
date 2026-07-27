@@ -431,6 +431,45 @@ git diff --check
 
 任何 AWS 部署前先读 `aws/AI_HANDOFF.md`。
 
+### GitHub Actions 生产流水线
+
+仓库：`https://github.com/yiligeng/gate-xau-monitor`，必须保持 private。
+
+已设计为：
+
+- `CI`：PR 和 `main` push 自动跑测试，不碰生产服务器。
+- `Deploy Production`：只允许在 GitHub Actions 页面手动
+  `Run workflow`，且必须从 `main` 分支运行。
+- GitHub 当前 plan 不支持 private repo 的 `production` environment required
+  reviewers；不要改成 `main` push 自动部署，否则会绕过人工批准。
+- 生产部署跑在 Lightsail self-hosted runner，标签为
+  `self-hosted`, `xau-monitor`, `production`。
+- GitHub 不保存服务器 SSH 私钥、数据库 URL、企微 Secret 或 AWS 凭据。
+- self-hosted runner 使用低权限用户；sudo 只允许执行固定脚本：
+  `/usr/local/sbin/deploy-xau-monitor`。
+- 固定脚本源模板：`ops/deploy-xau-monitor`。服务器上的实际脚本必须由
+  root 拥有，不应由普通 deploy workflow 自动覆盖。
+
+部署脚本逻辑：
+
+1. 只接受 GitHub Actions runner workspace 作为源目录。
+2. 校验 commit SHA 和项目结构。
+3. 备份 `/opt/xau-monitor` 的项目文件到
+   `/var/backups/xau-monitor-deploy`。
+4. 同步 `src/`、`db/`、`aws/` 和项目文档到 `/opt/xau-monitor`。
+5. 使用生产 `.venv` 安装 `.[wecom]`。
+6. 执行数据库建表/迁移脚本。
+7. 重启 `xau-monitor` 与 `xau-monitor-wecom-bot`。
+
+禁止：
+
+- 不要把 `/Users/a11/.ssh/aws-lightsail-tokyo-default.pem` 放入 GitHub
+  Secrets。
+- 不要让 GitHub-hosted runner 直接 SSH 到生产服务器。
+- 不要把 `Deploy Production` 改成 `push` 自动触发，除非 GitHub 环境审批
+  保护规则已经可用并验证生效。
+- 不要给 self-hosted runner 用户 unrestricted sudo。
+
 ### 代码同步
 
 项目当前没有成熟的 Git 发布流程，实际使用 SSH/rsync：

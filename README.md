@@ -45,6 +45,17 @@ API Key，也不会下单。网页版同时支持 XAUUSD 黄金 CFD 与 BTC_USDT
 
 需要 Python 3.10 或更高版本。
 
+## 部署流水线
+
+GitHub 私有仓库已配置为适合生产审批式部署：
+
+- PR 和 `main` push 会自动跑 CI。
+- 生产部署只在 GitHub Actions 页面手动运行 `Deploy Production`。
+- 手动运行后由 Lightsail 上的 self-hosted runner 执行固定部署脚本。
+- GitHub 不保存服务器 SSH 私钥、数据库连接串或企微 Secret。
+
+服务器实际部署脚本模板在 `ops/deploy-xau-monitor`。
+
 ### 生产网站（推荐）
 
 直接访问：

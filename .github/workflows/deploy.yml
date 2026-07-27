@@ -1,0 +1,39 @@
+name: Deploy Production
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to Lightsail
+    runs-on:
+      - self-hosted
+      - xau-monitor
+      - production
+    timeout-minutes: 20
+    steps:
+      # actions/checkout v4 pinned 2026-07-28.
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Verify and test in runner workspace
+        run: |
+          test "$GITHUB_REF" = "refs/heads/main"
+          python3 -m venv .ci-venv
+          .ci-venv/bin/python -m pip install --upgrade pip
+          .ci-venv/bin/python -m pip install -e ".[wecom]"
+          .ci-venv/bin/python -m unittest discover -s tests
+          if command -v node >/dev/null 2>&1; then
+            node --check src/xau_monitor/web_static/dashboard.js
+          fi
+
+      - name: Deploy with fixed server script
+        run: sudo /usr/local/sbin/deploy-xau-monitor "$GITHUB_WORKSPACE" "$GITHUB_SHA"

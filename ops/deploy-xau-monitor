@@ -48,6 +48,17 @@ fi
 timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
 install -d -o root -g root -m 0750 "${backup_dir}"
 backup_path="${backup_dir}/xau-monitor-${timestamp}-${commit_sha:0:12}.tar.gz"
+backup_items=(
+  xau-monitor/src
+  xau-monitor/db
+  xau-monitor/aws
+  xau-monitor/pyproject.toml
+  xau-monitor/README.md
+  xau-monitor/AI_PROJECT_KNOWLEDGE.md
+)
+if [[ -f "${app_dir}/AGENTS.md" ]]; then
+  backup_items+=(xau-monitor/AGENTS.md)
+fi
 
 tar \
   --exclude='.venv' \
@@ -55,13 +66,7 @@ tar \
   --exclude='*.pyc' \
   -C /opt \
   -czf "${backup_path}" \
-  xau-monitor/src \
-  xau-monitor/db \
-  xau-monitor/aws \
-  xau-monitor/pyproject.toml \
-  xau-monitor/README.md \
-  xau-monitor/AI_PROJECT_KNOWLEDGE.md \
-  xau-monitor/AGENTS.md
+  "${backup_items[@]}"
 
 find "${backup_dir}" -type f -name 'xau-monitor-*.tar.gz' -mtime +14 -delete
 

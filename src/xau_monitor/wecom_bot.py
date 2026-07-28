@@ -429,45 +429,56 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
             print("未配置 DATABASE_URL，点位提醒功能未启用。", flush=True)
             return
         last_sequences: dict[str, int] = {}
+        consecutive_errors = 0
         while True:
-            for market_id, state in states.items():
-                payload = state.payload()
-                if not payload.get("ok"):
-                    continue
-                sequence = int(payload.get("feed", {}).get("sequence") or 0)
-                if last_sequences.get(market_id) == sequence:
-                    continue
-                last_sequences[market_id] = sequence
-                current_price = float(payload["ticker"]["last"])
-                notifications = await asyncio.to_thread(
-                    alert_store.collect_due_alerts,
-                    market_id,
-                    current_price,
-                )
-                for notification in notifications:
-                    try:
-                        await ws_client.send_message(
-                            notification.chat_id,
-                            {
-                                "msgtype": "markdown",
-                                "markdown": {
-                                    "content": format_alert_notification(notification)
+            try:
+                for market_id, state in states.items():
+                    payload = state.payload()
+                    if not payload.get("ok"):
+                        continue
+                    sequence = int(payload.get("feed", {}).get("sequence") or 0)
+                    if last_sequences.get(market_id) == sequence:
+                        continue
+                    last_sequences[market_id] = sequence
+                    current_price = float(payload["ticker"]["last"])
+                    notifications = await asyncio.to_thread(
+                        alert_store.collect_due_alerts,
+                        market_id,
+                        current_price,
+                    )
+                    for notification in notifications:
+                        try:
+                            await ws_client.send_message(
+                                notification.chat_id,
+                                {
+                                    "msgtype": "markdown",
+                                    "markdown": {
+                                        "content": format_alert_notification(notification)
+                                    },
                                 },
-                            },
-                        )
-                        await asyncio.to_thread(
-                            alert_store.confirm_alert_notification,
-                            notification,
-                        )
-                    except Exception as exc:
-                        print(
-                            "企业微信点位提醒发送失败，保留待重试："
-                            f"alert_id={notification.id} "
-                            f"event={notification.event} "
-                            f"stage={notification.stage} "
-                            f"error={exc}",
-                            flush=True,
-                        )
+                            )
+                            await asyncio.to_thread(
+                                alert_store.confirm_alert_notification,
+                                notification,
+                            )
+                        except Exception as exc:
+                            print(
+                                "企业微信点位提醒发送失败，保留待重试："
+                                f"alert_id={notification.id} "
+                                f"event={notification.event} "
+                                f"stage={notification.stage} "
+                                f"error={exc}",
+                                flush=True,
+                            )
+                consecutive_errors = 0
+            except Exception as exc:
+                consecutive_errors += 1
+                if consecutive_errors == 1 or consecutive_errors % 60 == 0:
+                    print(
+                        "企业微信点位提醒循环暂不可用，继续重试："
+                        f"{type(exc).__name__}",
+                        flush=True,
+                    )
             await asyncio.sleep(0.1)
 
     async def wick_reconciliation_loop() -> None:

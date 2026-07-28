@@ -14,7 +14,7 @@ import psycopg
 
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 DEFAULT_APPROACH_DISTANCE = 3.0
-DEFAULT_ALERT_LIMIT = 2
+DEFAULT_ALERT_LIMIT = 3
 DEFAULT_REPEAT_SECONDS = 60
 POINT_STRATEGY_VERSION = "LEVEL-5X5-V1"
 POINT_STRATEGY_RISK = Decimal("5.00")
@@ -50,6 +50,8 @@ class AlertNotification:
     alerts_sent: int
     alert_limit: int
     expires_at: datetime
+    event: str
+    stage: int
 
 
 class PriceAlertStore:
@@ -937,86 +939,39 @@ class PriceAlertStore:
                     "expires_at": row[10],
                 }
                 if is_breached(alert, current_price):
+                    final_stage = int(alert["alert_limit"])
+                    notifications.append(
+                        AlertNotification(
+                            id=alert["id"],
+                            chat_id=alert["chat_id"],
+                            market=alert["market"],
+                            level=alert["level"],
+                            price=current_price,
+                            distance=abs(current_price - alert["level"]),
+                            alerts_sent=final_stage,
+                            alert_limit=final_stage,
+                            expires_at=alert["expires_at"],
+                            event="breached",
+                            stage=final_stage,
+                        )
+                    )
+                    continue
+                stage = alert_stage(alert, current_price)
+                sent = int(alert["alerts_sent"])
+                if stage < sent:
                     connection.execute(
                         """
                         UPDATE app.price_alerts
-                        SET status = 'breached',
-                            breached_at = %s,
+                        SET alerts_sent = %s,
+                            last_alert_at = NULL,
                             updated_at = %s
                         WHERE id = %s
                         """,
-                        (now, now, alert["id"]),
+                        (stage, now, alert["id"]),
                     )
-                    trial_row = connection.execute(
-                        """
-                        SELECT id, status, direction, entry_price,
-                               stop_loss, take_profit
-                        FROM app.point_strategy_trials
-                        WHERE price_alert_id = %s
-                        FOR UPDATE
-                        """,
-                        (alert["id"],),
-                    ).fetchone()
-                    if trial_row is not None and trial_row[1] == "pending":
-                        trial = {
-                            "status": trial_row[1],
-                            "direction": trial_row[2],
-                            "entry_price": float(trial_row[3]),
-                            "stop_loss": float(trial_row[4]),
-                            "take_profit": float(trial_row[5]),
-                        }
-                        next_status = strategy_status_for_price(
-                            trial,
-                            current_price,
-                        )
-                        if next_status in {"open", "loss"}:
-                            connection.execute(
-                                """
-                                UPDATE app.point_strategy_trials
-                                SET status = %s,
-                                    trigger_observed_price = %s,
-                                    exit_observed_price = CASE
-                                        WHEN %s = 'loss' THEN %s
-                                        ELSE exit_observed_price
-                                    END,
-                                    triggered_at = %s,
-                                    resolved_at = CASE
-                                        WHEN %s = 'loss' THEN %s
-                                        ELSE resolved_at
-                                    END,
-                                    strategy_reconciled_at = %s,
-                                    resolution_source = 'gate_last_live',
-                                    ambiguity_reason = NULL,
-                                    updated_at = %s
-                                WHERE id = %s
-                                """,
-                                (
-                                    next_status,
-                                    current_price,
-                                    next_status,
-                                    current_price,
-                                    now,
-                                    next_status,
-                                    now,
-                                    now,
-                                    now,
-                                    trial_row[0],
-                                ),
-                            )
-                    continue
+                    sent = stage
                 if not should_alert(alert, current_price, repeat_after):
                     continue
-                next_count = alert["alerts_sent"] + 1
-                connection.execute(
-                    """
-                    UPDATE app.price_alerts
-                    SET alerts_sent = %s,
-                        last_alert_at = %s,
-                        updated_at = %s
-                    WHERE id = %s
-                    """,
-                    (next_count, now, now, alert["id"]),
-                )
                 notifications.append(
                     AlertNotification(
                         id=alert["id"],
@@ -1025,9 +980,11 @@ class PriceAlertStore:
                         level=alert["level"],
                         price=current_price,
                         distance=abs(current_price - alert["level"]),
-                        alerts_sent=next_count,
+                        alerts_sent=stage,
                         alert_limit=alert["alert_limit"],
                         expires_at=alert["expires_at"],
+                        event="approach",
+                        stage=stage,
                     )
                 )
             open_rows = connection.execute(
@@ -1068,6 +1025,96 @@ class PriceAlertStore:
                     (next_status, current_price, now, now, now, row[0]),
                 )
         return notifications
+
+    def confirm_alert_notification(
+        self,
+        notification: AlertNotification,
+        now: datetime | None = None,
+    ) -> None:
+        now = now or utc_now()
+        with self._connect() as connection:
+            if notification.event == "breached":
+                connection.execute(
+                    """
+                    UPDATE app.price_alerts
+                    SET status = 'breached',
+                        alerts_sent = GREATEST(alerts_sent, %s),
+                        last_alert_at = %s,
+                        breached_at = COALESCE(breached_at, %s),
+                        updated_at = %s
+                    WHERE id = %s
+                      AND status = 'active'
+                    """,
+                    (notification.stage, now, now, now, notification.id),
+                )
+                trial_row = connection.execute(
+                    """
+                    SELECT id, status, direction, entry_price,
+                           stop_loss, take_profit
+                    FROM app.point_strategy_trials
+                    WHERE price_alert_id = %s
+                    FOR UPDATE
+                    """,
+                    (notification.id,),
+                ).fetchone()
+                if trial_row is not None and trial_row[1] == "pending":
+                    trial = {
+                        "status": trial_row[1],
+                        "direction": trial_row[2],
+                        "entry_price": float(trial_row[3]),
+                        "stop_loss": float(trial_row[4]),
+                        "take_profit": float(trial_row[5]),
+                    }
+                    next_status = strategy_status_for_price(
+                        trial,
+                        notification.price,
+                    )
+                    if next_status in {"open", "loss"}:
+                        connection.execute(
+                            """
+                            UPDATE app.point_strategy_trials
+                            SET status = %s,
+                                trigger_observed_price = %s,
+                                exit_observed_price = CASE
+                                    WHEN %s = 'loss' THEN %s
+                                    ELSE exit_observed_price
+                                END,
+                                triggered_at = %s,
+                                resolved_at = CASE
+                                    WHEN %s = 'loss' THEN %s
+                                    ELSE resolved_at
+                                END,
+                                strategy_reconciled_at = %s,
+                                resolution_source = 'gate_last_live',
+                                ambiguity_reason = NULL,
+                                updated_at = %s
+                            WHERE id = %s
+                            """,
+                            (
+                                next_status,
+                                notification.price,
+                                next_status,
+                                notification.price,
+                                now,
+                                next_status,
+                                now,
+                                now,
+                                now,
+                                trial_row[0],
+                            ),
+                        )
+                return
+            connection.execute(
+                """
+                UPDATE app.price_alerts
+                SET alerts_sent = GREATEST(alerts_sent, %s),
+                    last_alert_at = %s,
+                    updated_at = %s
+                WHERE id = %s
+                  AND status = 'active'
+                """,
+                (notification.stage, now, now, notification.id),
+            )
 
 
 def utc_now() -> datetime:
@@ -1352,9 +1399,19 @@ def should_alert(
     current_price: float,
     repeat_after: datetime,
 ) -> bool:
-    if int(alert["alerts_sent"]) >= int(alert["alert_limit"]):
+    del repeat_after
+    stage = alert_stage(alert, current_price)
+    if stage <= 0:
         return False
-    if abs(current_price - float(alert["level"])) > float(alert["approach_distance"]):
+    if stage <= int(alert["alerts_sent"]):
         return False
-    last_alert_at = alert.get("last_alert_at")
-    return last_alert_at is None or last_alert_at <= repeat_after
+    return True
+
+
+def alert_stage(alert: dict[str, Any], current_price: float) -> int:
+    distance = abs(current_price - float(alert["level"]))
+    if distance <= 2:
+        return min(2, int(alert["alert_limit"]))
+    if distance <= float(alert["approach_distance"]):
+        return 1
+    return 0

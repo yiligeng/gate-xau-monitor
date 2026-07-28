@@ -2,6 +2,7 @@ import unittest
 
 from xau_monitor.api import Candle
 from xau_monitor.price_alerts import (
+    alert_stage,
     build_point_strategy_plan,
     decode_trial_cursor,
     encode_trial_cursor,
@@ -86,13 +87,39 @@ class WeComBotFormatterTests(unittest.TestCase):
             "side": "below",
             "approach_distance": 3.0,
             "alerts_sent": 0,
-            "alert_limit": 2,
+            "alert_limit": 3,
             "last_alert_at": None,
         }
 
         self.assertTrue(should_alert(alert, 4000.0, __import__("datetime").datetime.now()))
         self.assertFalse(is_breached(alert, 4000.0))
         self.assertTrue(is_breached(alert, 3997.0))
+
+    def test_alert_stages_reset_when_price_moves_away(self) -> None:
+        alert = {
+            "level": 3997.0,
+            "side": "below",
+            "approach_distance": 3.0,
+            "alerts_sent": 0,
+            "alert_limit": 3,
+            "last_alert_at": None,
+        }
+
+        self.assertEqual(alert_stage(alert, 4000.0), 1)
+        self.assertEqual(alert_stage(alert, 3998.9), 2)
+        self.assertEqual(alert_stage(alert, 4000.4), 0)
+
+    def test_next_stage_can_alert_without_waiting_repeat_window(self) -> None:
+        alert = {
+            "level": 3997.0,
+            "side": "below",
+            "approach_distance": 3.0,
+            "alerts_sent": 1,
+            "alert_limit": 3,
+            "last_alert_at": __import__("datetime").datetime.now(),
+        }
+
+        self.assertTrue(should_alert(alert, 3998.8, __import__("datetime").datetime.now()))
 
     def test_builds_fixed_five_point_long_plan(self) -> None:
         plan = build_point_strategy_plan(4050.0, 4046.98)

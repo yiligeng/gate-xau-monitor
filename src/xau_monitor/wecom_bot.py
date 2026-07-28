@@ -350,14 +350,24 @@ def reply_for_text(
 
 
 def format_alert_notification(notification: AlertNotification) -> str:
+    if notification.event == "breached":
+        title = f"**{market_display_name(notification.market)} 点位已触达**"
+        status = "价格已经击穿/触达目标位，本点位今日告警作废。"
+    elif notification.stage >= 2:
+        title = f"**{market_display_name(notification.market)} 点位二级提醒**"
+        status = "距离目标位 <= 2 美元；若未触达并远离，二级提醒次数会恢复。"
+    else:
+        title = f"**{market_display_name(notification.market)} 点位一级提醒**"
+        status = "距离目标位 <= 3 美元；若未触达并远离，一级提醒次数会恢复。"
     return "\n".join(
         [
-            f"**{market_display_name(notification.market)} 点位提醒**",
+            title,
             f"当前价：{notification.price:,.2f}",
             f"目标位：{notification.level:,.2f}",
             f"距离：{notification.distance:.2f}",
             f"提醒次数：{notification.alerts_sent}/{notification.alert_limit}",
-            "触达后告警作废；±5点策略会继续跟踪到止盈或止损。",
+            status,
+            "±5点策略会继续跟踪到止盈或止损。",
         ]
     )
 
@@ -435,15 +445,29 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
                     current_price,
                 )
                 for notification in notifications:
-                    await ws_client.send_message(
-                        notification.chat_id,
-                        {
-                            "msgtype": "markdown",
-                            "markdown": {
-                                "content": format_alert_notification(notification)
+                    try:
+                        await ws_client.send_message(
+                            notification.chat_id,
+                            {
+                                "msgtype": "markdown",
+                                "markdown": {
+                                    "content": format_alert_notification(notification)
+                                },
                             },
-                        },
-                    )
+                        )
+                        await asyncio.to_thread(
+                            alert_store.confirm_alert_notification,
+                            notification,
+                        )
+                    except Exception as exc:
+                        print(
+                            "企业微信点位提醒发送失败，保留待重试："
+                            f"alert_id={notification.id} "
+                            f"event={notification.event} "
+                            f"stage={notification.stage} "
+                            f"error={exc}",
+                            flush=True,
+                        )
             await asyncio.sleep(0.1)
 
     async def wick_reconciliation_loop() -> None:

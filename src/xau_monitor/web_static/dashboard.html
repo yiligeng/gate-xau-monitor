@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=20">
+    <link rel="stylesheet" href="/dashboard.css?v=21">
   </head>
   <body>
     <main class="shell">
@@ -381,7 +381,7 @@
 
           <div class="bot-alerts">
             <div class="bot-alerts-head">
-              <span>活跃点位</span>
+              <span>今日点位记录（含已触达）</span>
               <strong id="bot-alert-count">0</strong>
             </div>
             <div id="bot-alert-list" class="bot-alert-list">
@@ -442,8 +442,8 @@
               <strong id="bot-strategy-expectancy">--</strong>
             </div>
             <div>
-              <span>持仓 / 待触发</span>
-              <strong id="bot-strategy-live">0 / 0</strong>
+              <span>持仓 / 待触发 / 待复核</span>
+              <strong id="bot-strategy-live">0 / 0 / 0</strong>
             </div>
           </div>
 
@@ -467,7 +467,7 @@
                     <th>胜 / 负</th>
                     <th>胜率</th>
                     <th>理论点数</th>
-                    <th>持仓 / 待触发</th>
+                    <th>持仓 / 待触发 / 待复核</th>
                     <th>未触发</th>
                   </tr>
                 </thead>
@@ -491,6 +491,7 @@
                   <option value="loss">负</option>
                   <option value="open">持仓中</option>
                   <option value="pending">待触发</option>
+                  <option value="ambiguous">顺序待复核</option>
                   <option value="expired">未触发</option>
                   <option value="replaced">已覆盖</option>
                   <option value="cancelled">已取消</option>
@@ -510,9 +511,9 @@
             </div>
           </div>
           <p class="bot-strategy-note">
-            按 Gate 最新价判断，不含点差、滑点和手续费；这是规则命中率，
-            不是实际净收益率。相邻点位可能由同一次行情波动触发，不能当作
-            完全独立的统计样本。
+            实时最新价与 Gate 1 秒 K 线高低点会共同校验瞬时插针；同一秒内
+            同时触及止损和止盈且无法确认先后时，只记为“顺序待复核”，不计入
+            胜率。不含点差、滑点和手续费；这是规则命中率，不是实际净收益率。
           </p>
         </div>
       </section>
@@ -524,6 +525,6 @@
       <p id="strategy-help-body"></p>
       <code id="strategy-help-formula"></code>
     </div>
-    <script src="/dashboard.js?v=21"></script>
+    <script src="/dashboard.js?v=22"></script>
   </body>
 </html>

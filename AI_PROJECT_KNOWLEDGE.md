@@ -166,6 +166,8 @@ systemd 从下面的 root-only 文件加载数据库连接：
 - 网页 API：`GET /api/bot/alerts`、`POST /api/bot/alerts`、
   `POST /api/bot/alerts/cancel`、`GET /api/bot/strategy-stats`
 - 存储：`app.price_alerts`、`app.point_strategy_trials`
+- `app.price_alerts.alerts_sent`、`last_alert_at`、`breached_at` 持久化提醒与
+  触达状态；网页“今日点位记录”包含已触达点位，不只显示 `active`
 - 有效期：北京时间当天 24 点
 - 告警：距离点位小于等于 3 美元，最多 2 次，默认两次至少间隔 60 秒
 - 作废：从创建时价格所在一侧触达或穿过点位后，状态改为 `breached`
@@ -180,6 +182,11 @@ systemd 从下面的 root-only 文件加载数据库连接：
 - 做空：止损为点位加 5 美元，止盈为点位减 5 美元
 - 入场后跨日继续跟踪，直到先触发 `win` 或 `loss`
 - 替换、取消、当天未触发的样本不进入胜率分母
+- XAU 同时使用约 0.25 秒的 Gate `last` 和 Gate 1 秒 K 线高低点校验；
+  后者用于捕捉报价轮询之间的一闪而过插针
+- 同一 1 秒 K 线同时触及止损和止盈，或入场与止盈同秒而无法确认先后时，
+  状态为 `ambiguous`，展示为“顺序待复核”，不进入胜率分母
+- `resolution_source` 区分 `gate_last_live` 与 `gate_1s_kline`
 - 胜率：`wins / (wins + losses)`
 - 使用 Gate `last` 最新价，不含点差、滑点和手续费；统计是规则命中率，
   不是实际净收益率
@@ -193,6 +200,7 @@ systemd 从下面的 root-only 文件加载数据库连接：
 
 2026-07-28 上线迁移时，24 条已有黄金告警中有 22 条仍活跃并被回填为
 `pending`；另外 2 条已经触达，因缺少触达后的历史逐价数据，没有伪造输赢。
+这 2 条继续保留原始提醒次数和触达状态，但按用户决定不回补策略胜负。
 
 行情节奏：
 
@@ -353,8 +361,9 @@ Schema：`app`
 - `db/migrations/003_price_alerts.sql`
 - `db/migrations/004_point_strategy_trials.sql`
 - `db/migrations/005_strategy_dashboard_indexes.sql`
+- `db/migrations/006_strategy_tick_reconciliation.sql`
 
-当前 schema version：5。
+当前 schema version：6。
 
 表：
 
@@ -388,6 +397,8 @@ Schema：`app`
 - `point_strategy_trials_daily_idx`：会话、市场、设置日、方向、状态，
   服务每日聚合
 - `point_strategy_trials_page_idx`：会话、市场、递减 ID，服务稳定游标分页
+- `point_strategy_trials_reconcile_idx`：待触发/持仓样本的一秒插针校验
+- `price_alerts_chat_market_created_idx`：按会话读取完整今日提醒记录
 
 ### 备份
 
@@ -450,7 +461,7 @@ bash -n aws/postgresql/xau-monitor-db-backup
 git diff --check
 ```
 
-2026-07-28：31 项 unittest 全部通过。
+2026-07-28：34 项 unittest 全部通过。
 
 测试覆盖：
 
@@ -465,6 +476,7 @@ git diff --check
 - Secure/HttpOnly/SameSite Cookie
 - ±5 美元做多/做空计划
 - 待触发、持仓、止盈和止损状态转换
+- 1 秒 K 线插针止损捕获，以及同秒止盈止损的 `ambiguous` 保护
 - 空样本不伪造胜率
 
 生产黑盒验证不要在命令行参数、日志或输出中显示密码和 Cookie。

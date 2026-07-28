@@ -14,7 +14,7 @@ Lightsail 实例，不是 AWS RDS，也不会产生新的 AWS 固定资源费用
 - 密码认证：SCRAM-SHA-256
 - 应用连接配置：`/etc/xau-monitor/database.env`
 - 当前迁移：`db/migrations/001_initial.sql` 至
-  `db/migrations/005_strategy_dashboard_indexes.sql`
+  `db/migrations/006_strategy_tick_reconciliation.sql`
 - 幂等初始化脚本：`aws/postgresql/bootstrap-local`
 - 自动备份：每天约 03:15 UTC（上海时间约 11:15），保留最近 7 天
 - 备份目录：`/var/backups/xau-monitor-postgresql`
@@ -52,13 +52,17 @@ SQL 文件，例如 `002_add_users.sql`，并向 `app.schema_migrations` 写入�
 写入；接入持久化时应限制写入频率，并制定按时间删除或归档的策略。
 `app.users` 和 `app.sessions` 已经用于生产登录，迁移时必须包含且需要验证。
 `app.price_alerts` 保存每日点位告警，`app.point_strategy_trials` 保存
-`LEVEL-5X5-V1` 的待触发、持仓、胜负和审计价格；这两张表也必须完整迁移。
+`LEVEL-5X5-V1` 的待触发、持仓、胜负、顺序待复核、结算来源和审计价格；
+这两张表也必须完整迁移。提醒次数、最后提醒时间和触达时间均在
+`app.price_alerts`，不能只迁移仍为 `active` 的行。
 
 策略看板按北京时间的点位设置日聚合，并使用游标分页：
 
 - `setup_day`：点位创建时间转换到 `Asia/Shanghai` 后固化的日期
 - `point_strategy_trials_daily_idx`：每日、方向和状态聚合
 - `point_strategy_trials_page_idx`：按递减 ID 的逐笔游标分页
+- `point_strategy_trials_reconcile_idx`：实时价与 1 秒 K 线插针校验的工作索引
+- `price_alerts_chat_market_created_idx`：读取今日提醒与触达历史
 
 不要用不断增大的 SQL `OFFSET` 翻页；长期数据增长后应继续使用
 `id < cursor_id ORDER BY id DESC LIMIT ...`。

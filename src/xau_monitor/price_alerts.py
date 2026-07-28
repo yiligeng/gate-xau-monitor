@@ -26,6 +26,7 @@ POINT_STRATEGY_STATUSES = {
     "open",
     "win",
     "loss",
+    "ambiguous",
     "expired",
     "replaced",
     "cancelled",
@@ -252,6 +253,64 @@ class PriceAlertStore:
             for row in rows
         ]
 
+    def today_alerts(
+        self,
+        chat_id: str,
+        market: str,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        now = now or utc_now()
+        local_now = now.astimezone(SHANGHAI)
+        day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT alert.id, alert.level, alert.created_price, alert.side,
+                       alert.alerts_sent, alert.alert_limit, alert.expires_at,
+                       alert.status, alert.created_at, alert.last_alert_at,
+                       alert.breached_at,
+                       trial.direction, trial.entry_price, trial.stop_loss,
+                       trial.take_profit, trial.status
+                FROM app.price_alerts AS alert
+                LEFT JOIN app.point_strategy_trials AS trial
+                  ON trial.price_alert_id = alert.id
+                WHERE alert.chat_id = %s
+                  AND alert.market = %s
+                  AND alert.created_at >= %s
+                  AND alert.created_at < %s
+                ORDER BY alert.level DESC, alert.id DESC
+                """,
+                (chat_id, market, day_start, day_end),
+            ).fetchall()
+        return [
+            {
+                "id": row[0],
+                "level": float(row[1]),
+                "created_price": float(row[2]),
+                "side": row[3],
+                "alerts_sent": int(row[4]),
+                "alert_limit": int(row[5]),
+                "expires_at": row[6],
+                "status": row[7],
+                "created_at": row[8],
+                "last_alert_at": row[9],
+                "breached_at": row[10],
+                "strategy": (
+                    {
+                        "direction": row[11],
+                        "entry_price": float(row[12]),
+                        "stop_loss": float(row[13]),
+                        "take_profit": float(row[14]),
+                        "status": row[15],
+                    }
+                    if row[11] is not None
+                    else None
+                ),
+            }
+            for row in rows
+        ]
+
     def chat_summaries(
         self,
         market: str,
@@ -330,7 +389,10 @@ class PriceAlertStore:
                         0
                     ) AS net_points,
                     min(created_at) AS tracking_since,
-                    max(resolved_at) AS last_resolved_at
+                    max(resolved_at) AS last_resolved_at,
+                    count(*) FILTER (
+                        WHERE status = 'ambiguous'
+                    ) AS ambiguous_count
                 FROM app.point_strategy_trials
                 WHERE chat_id = %s
                   AND market = %s
@@ -361,7 +423,8 @@ class PriceAlertStore:
                     SELECT id, direction, initial_price, entry_price,
                            stop_loss, take_profit, status,
                            trigger_observed_price, exit_observed_price,
-                           created_at, triggered_at, resolved_at
+                           created_at, triggered_at, resolved_at,
+                           resolution_source, ambiguity_reason
                     FROM app.point_strategy_trials
                     WHERE chat_id = %s
                       AND market = %s
@@ -405,6 +468,7 @@ class PriceAlertStore:
             "win_rate": wins / settled * 100 if settled else None,
             "open": int(aggregate[2] or 0) if aggregate else 0,
             "pending": int(aggregate[3] or 0) if aggregate else 0,
+            "ambiguous": int(aggregate[10] or 0) if aggregate else 0,
             "expired": int(aggregate[4] or 0) if aggregate else 0,
             "replaced": int(aggregate[5] or 0) if aggregate else 0,
             "cancelled": int(aggregate[6] or 0) if aggregate else 0,
@@ -431,6 +495,8 @@ class PriceAlertStore:
                     "created_at": row[9],
                     "triggered_at": row[10],
                     "resolved_at": row[11],
+                    "resolution_source": row[12],
+                    "ambiguity_reason": row[13],
                 }
                 for row in recent_rows
             ],
@@ -528,7 +594,10 @@ class PriceAlertStore:
                             END
                         ),
                         0
-                    ) AS net_points
+                    ) AS net_points,
+                    count(*) FILTER (
+                        WHERE status = 'ambiguous'
+                    ) AS ambiguous_count
                 FROM app.point_strategy_trials
                 WHERE {" AND ".join(daily_conditions)}
                 GROUP BY setup_day
@@ -541,7 +610,8 @@ class PriceAlertStore:
                 SELECT id, setup_day, direction, initial_price, entry_price,
                        stop_loss, take_profit, status,
                        trigger_observed_price, exit_observed_price,
-                       created_at, triggered_at, resolved_at
+                       created_at, triggered_at, resolved_at,
+                       resolution_source, ambiguity_reason
                 FROM app.point_strategy_trials
                 WHERE {" AND ".join(detail_conditions)}
                 ORDER BY id DESC
@@ -565,6 +635,7 @@ class PriceAlertStore:
                     "win_rate": wins / settled * 100 if settled else None,
                     "open": int(row[3] or 0),
                     "pending": int(row[4] or 0),
+                    "ambiguous": int(row[9] or 0),
                     "expired": int(row[5] or 0),
                     "replaced": int(row[6] or 0),
                     "cancelled": int(row[7] or 0),
@@ -596,6 +667,8 @@ class PriceAlertStore:
                 "created_at": row[10],
                 "triggered_at": row[11],
                 "resolved_at": row[12],
+                "resolution_source": row[13],
+                "ambiguity_reason": row[14],
             }
             for row in page_rows
         ]
@@ -638,9 +711,16 @@ class PriceAlertStore:
             if selected_chat_id
             else []
         )
+        today_alerts = (
+            self.today_alerts(selected_chat_id, market, now)
+            if selected_chat_id
+            else []
+        )
         for alert in alerts:
             alert["distance"] = abs(current_price - alert["level"])
             alert["breached_if_touched"] = is_breached(alert, current_price)
+        for alert in today_alerts:
+            alert["distance"] = abs(current_price - alert["level"])
         strategy = self.strategy_stats(selected_chat_id, market)
         return {
             "market": market,
@@ -649,8 +729,154 @@ class PriceAlertStore:
             "chats": chats,
             "selected_chat_id": selected_chat_id,
             "alerts": alerts,
+            "today_alerts": today_alerts,
             "strategy": strategy,
         }
+
+    def reconcile_strategy_candles(
+        self,
+        market: str,
+        candles: list[Any],
+        now: datetime | None = None,
+    ) -> dict[str, int]:
+        now = now or utc_now()
+        ordered_candles = sorted(candles, key=lambda item: int(item.timestamp))
+        result = {"opened": 0, "won": 0, "lost": 0, "ambiguous": 0}
+        if not ordered_candles:
+            return result
+
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, price_alert_id, status, direction, entry_price,
+                       stop_loss, take_profit, triggered_at, entry_expires_at,
+                       strategy_reconciled_at
+                FROM app.point_strategy_trials
+                WHERE market = %s
+                  AND status IN ('pending', 'open')
+                ORDER BY id
+                FOR UPDATE SKIP LOCKED
+                """,
+                (market,),
+            ).fetchall()
+            for row in rows:
+                trial = {
+                    "status": str(row[2]),
+                    "direction": str(row[3]),
+                    "entry_price": float(row[4]),
+                    "stop_loss": float(row[5]),
+                    "take_profit": float(row[6]),
+                }
+                status = trial["status"]
+                triggered_at = row[7]
+                entry_expires_at = row[8]
+                reconciled_at = row[9]
+                trigger_price: float | None = None
+                exit_price: float | None = None
+                event_at: datetime | None = None
+                ambiguity_reason: str | None = None
+                state_changed = False
+
+                for candle in ordered_candles:
+                    candle_start = datetime.fromtimestamp(
+                        int(candle.timestamp),
+                        tz=timezone.utc,
+                    )
+                    candle_end = candle_start + timedelta(seconds=1)
+                    if reconciled_at and candle_end <= reconciled_at:
+                        continue
+                    if candle_start > now:
+                        break
+                    current_status = status
+                    next_status, next_reason = strategy_status_for_candle(
+                        trial | {"status": current_status},
+                        candle,
+                    )
+                    if current_status == "pending":
+                        if candle_start >= entry_expires_at:
+                            break
+                        if next_status == "pending":
+                            continue
+                        status = next_status
+                        triggered_at = candle_end
+                        trigger_price = trial["entry_price"]
+                        event_at = candle_end
+                        ambiguity_reason = next_reason
+                        state_changed = True
+                        if status == "loss":
+                            exit_price = trial["stop_loss"]
+                            break
+                        if status == "ambiguous":
+                            break
+                        continue
+
+                    if next_status == "open":
+                        continue
+                    status = next_status
+                    event_at = candle_end
+                    ambiguity_reason = next_reason
+                    state_changed = True
+                    if status == "loss":
+                        exit_price = trial["stop_loss"]
+                    elif status == "win":
+                        exit_price = trial["take_profit"]
+                    break
+
+                if not state_changed or event_at is None:
+                    continue
+                terminal = status in {"win", "loss", "ambiguous"}
+                connection.execute(
+                    """
+                    UPDATE app.point_strategy_trials
+                    SET status = %s,
+                        trigger_observed_price = COALESCE(
+                            trigger_observed_price,
+                            %s
+                        ),
+                        exit_observed_price = %s,
+                        triggered_at = COALESCE(triggered_at, %s),
+                        resolved_at = %s,
+                        strategy_reconciled_at = %s,
+                        resolution_source = 'gate_1s_kline',
+                        ambiguity_reason = %s,
+                        updated_at = %s
+                    WHERE id = %s
+                    """,
+                    (
+                        status,
+                        trigger_price,
+                        exit_price,
+                        triggered_at,
+                        event_at if terminal else None,
+                        event_at,
+                        ambiguity_reason,
+                        now,
+                        row[0],
+                    ),
+                )
+                if triggered_at is not None and trial["status"] == "pending":
+                    connection.execute(
+                        """
+                        UPDATE app.price_alerts
+                        SET status = CASE
+                                WHEN status = 'active' THEN 'breached'
+                                ELSE status
+                            END,
+                            breached_at = COALESCE(breached_at, %s),
+                            updated_at = %s
+                        WHERE id = %s
+                        """,
+                        (triggered_at, now, row[1]),
+                    )
+                result[
+                    {
+                        "open": "opened",
+                        "win": "won",
+                        "loss": "lost",
+                        "ambiguous": "ambiguous",
+                    }[status]
+                ] += 1
+        return result
 
     def collect_due_alerts(
         self,
@@ -758,6 +984,9 @@ class PriceAlertStore:
                                         WHEN %s = 'loss' THEN %s
                                         ELSE resolved_at
                                     END,
+                                    strategy_reconciled_at = %s,
+                                    resolution_source = 'gate_last_live',
+                                    ambiguity_reason = NULL,
                                     updated_at = %s
                                 WHERE id = %s
                                 """,
@@ -768,6 +997,7 @@ class PriceAlertStore:
                                     current_price,
                                     now,
                                     next_status,
+                                    now,
                                     now,
                                     now,
                                     trial_row[0],
@@ -829,10 +1059,13 @@ class PriceAlertStore:
                     SET status = %s,
                         exit_observed_price = %s,
                         resolved_at = %s,
+                        strategy_reconciled_at = %s,
+                        resolution_source = 'gate_last_live',
+                        ambiguity_reason = NULL,
                         updated_at = %s
                     WHERE id = %s
                     """,
-                    (next_status, current_price, now, now, row[0]),
+                    (next_status, current_price, now, now, now, row[0]),
                 )
         return notifications
 
@@ -922,6 +1155,64 @@ def strategy_status_for_price(
     return "open"
 
 
+def strategy_candle_hits(
+    trial: dict[str, Any],
+    candle: Any,
+) -> dict[str, bool]:
+    direction = str(trial["direction"])
+    entry = _price_decimal(float(trial["entry_price"]))
+    stop_loss = _price_decimal(float(trial["stop_loss"]))
+    take_profit = _price_decimal(float(trial["take_profit"]))
+    high = _price_decimal(float(candle.high))
+    low = _price_decimal(float(candle.low))
+    if direction == "long":
+        return {
+            "entry": low <= entry,
+            "loss": low <= stop_loss,
+            "win": high >= take_profit,
+        }
+    if direction == "short":
+        return {
+            "entry": high >= entry,
+            "loss": high >= stop_loss,
+            "win": low <= take_profit,
+        }
+    raise ValueError("invalid trial direction")
+
+
+def strategy_status_for_candle(
+    trial: dict[str, Any],
+    candle: Any,
+) -> tuple[str, str | None]:
+    status = str(trial["status"])
+    if status not in {"pending", "open"}:
+        return status, None
+    hits = strategy_candle_hits(trial, candle)
+    if status == "pending":
+        if not hits["entry"]:
+            return "pending", None
+        if hits["loss"] and hits["win"]:
+            return (
+                "ambiguous",
+                "entry_stop_and_take_in_same_one_second_candle",
+            )
+        if hits["loss"]:
+            return "loss", None
+        if hits["win"]:
+            return (
+                "ambiguous",
+                "entry_and_take_in_same_one_second_candle",
+            )
+        return "open", None
+    if hits["loss"] and hits["win"]:
+        return "ambiguous", "stop_and_take_in_same_one_second_candle"
+    if hits["loss"]:
+        return "loss", None
+    if hits["win"]:
+        return "win", None
+    return "open", None
+
+
 def empty_strategy_stats() -> dict[str, Any]:
     return {
         "strategy_version": POINT_STRATEGY_VERSION,
@@ -934,6 +1225,7 @@ def empty_strategy_stats() -> dict[str, Any]:
         "win_rate": None,
         "open": 0,
         "pending": 0,
+        "ambiguous": 0,
         "expired": 0,
         "replaced": 0,
         "cancelled": 0,

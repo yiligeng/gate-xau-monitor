@@ -1,5 +1,6 @@
 import unittest
 
+from xau_monitor.api import Candle
 from xau_monitor.price_alerts import (
     build_point_strategy_plan,
     decode_trial_cursor,
@@ -10,6 +11,7 @@ from xau_monitor.price_alerts import (
     normalize_strategy_status,
     parse_today_levels_command,
     should_alert,
+    strategy_status_for_candle,
     strategy_status_for_price,
 )
 from xau_monitor.wecom_bot import (
@@ -144,6 +146,64 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertEqual(strategy_status_for_price(opened, 4051.25), "win")
         self.assertEqual(strategy_status_for_price(opened, 4061.25), "loss")
 
+    def test_one_second_candle_catches_wick_even_when_close_recovers(self) -> None:
+        trial = {
+            "status": "open",
+            "direction": "long",
+            "entry_price": 4046.98,
+            "stop_loss": 4041.98,
+            "take_profit": 4051.98,
+        }
+        candle = Candle(
+            timestamp=1_785_000_000,
+            open=4047.0,
+            high=4047.2,
+            low=4041.8,
+            close=4047.1,
+        )
+
+        self.assertEqual(strategy_status_for_candle(trial, candle), ("loss", None))
+
+    def test_same_second_stop_and_take_is_not_counted_as_win_or_loss(self) -> None:
+        trial = {
+            "status": "open",
+            "direction": "long",
+            "entry_price": 4046.98,
+            "stop_loss": 4041.98,
+            "take_profit": 4051.98,
+        }
+        candle = Candle(
+            timestamp=1_785_000_000,
+            open=4047.0,
+            high=4052.2,
+            low=4041.8,
+            close=4048.0,
+        )
+
+        status, reason = strategy_status_for_candle(trial, candle)
+        self.assertEqual(status, "ambiguous")
+        self.assertEqual(reason, "stop_and_take_in_same_one_second_candle")
+
+    def test_entry_and_take_in_same_second_requires_review(self) -> None:
+        trial = {
+            "status": "pending",
+            "direction": "long",
+            "entry_price": 4046.98,
+            "stop_loss": 4041.98,
+            "take_profit": 4051.98,
+        }
+        candle = Candle(
+            timestamp=1_785_000_000,
+            open=4048.0,
+            high=4052.2,
+            low=4046.8,
+            close=4051.5,
+        )
+
+        status, reason = strategy_status_for_candle(trial, candle)
+        self.assertEqual(status, "ambiguous")
+        self.assertEqual(reason, "entry_and_take_in_same_one_second_candle")
+
     def test_formats_empty_strategy_stats_without_fake_win_rate(self) -> None:
         reply = format_strategy_stats(
             "xau",
@@ -176,6 +236,7 @@ class WeComBotFormatterTests(unittest.TestCase):
     def test_dashboard_filter_validation(self) -> None:
         self.assertEqual(normalize_strategy_direction("LONG"), "long")
         self.assertEqual(normalize_strategy_status("win"), "win")
+        self.assertEqual(normalize_strategy_status("ambiguous"), "ambiguous")
         self.assertEqual(str(normalize_setup_day("2026-07-28")), "2026-07-28")
         with self.assertRaises(ValueError):
             normalize_strategy_direction("sideways")

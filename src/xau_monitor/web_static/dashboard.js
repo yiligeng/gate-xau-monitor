@@ -423,6 +423,7 @@ const BOT_STRATEGY_STATUS_LABELS = {
   open: "持仓中",
   win: "胜",
   loss: "负",
+  ambiguous: "顺序待复核",
   expired: "未触发",
   replaced: "已覆盖",
   cancelled: "已取消",
@@ -456,7 +457,7 @@ function renderBotStrategySummary(strategy = {}) {
   );
   setText(
     "bot-strategy-live",
-    `${Number(strategy.open || 0)} / ${Number(strategy.pending || 0)}`,
+    `${Number(strategy.open || 0)} / ${Number(strategy.pending || 0)} / ${Number(strategy.ambiguous || 0)}`,
   );
 }
 
@@ -575,7 +576,7 @@ function renderBotStrategyDaily(daily = []) {
       <td>${Number(row.wins || 0)} / ${Number(row.losses || 0)}</td>
       <td>${row.win_rate == null ? "--" : `${Number(row.win_rate).toFixed(2)}%`}</td>
       <td>${strategySigned(row.net_points)}</td>
-      <td>${Number(row.open || 0)} / ${Number(row.pending || 0)}</td>
+      <td>${Number(row.open || 0)} / ${Number(row.pending || 0)} / ${Number(row.ambiguous || 0)}</td>
       <td>${Number(row.expired || 0)}</td>
     </tr>
   `).join("");
@@ -593,6 +594,7 @@ function renderBotStrategyTrials(trials = []) {
       <div class="${escapeHtml(trial.status || "")}">
         <span>${trial.direction === "long" ? "做多" : "做空"}</span>
         <strong>${BOT_STRATEGY_STATUS_LABELS[trial.status] || trial.status || "-"}</strong>
+        <small>${trial.resolution_source === "gate_1s_kline" ? "Gate 1秒K线校验" : "Gate 实时价"}</small>
       </div>
       <div>
         <span>设置日 / 时间</span>
@@ -695,11 +697,14 @@ function renderBotAlerts(data) {
   botSelectedChatId = data.selected_chat_id || "";
   setText("bot-current-price", priceFormat.format(data.current_price || 0));
   setText("bot-expires-at", formatBotExpiry(data.expires_at));
-  setText("bot-alert-count", String(data.alerts?.length || 0));
+  const activeAlerts = data.alerts || [];
+  const alerts = data.today_alerts || activeAlerts;
+  const breachedCount = alerts.filter((alert) => alert.status === "breached").length;
+  setText("bot-alert-count", String(alerts.length));
   setText(
     "bot-state",
     botSelectedChatId
-      ? `${data.alerts?.length || 0} 条活跃`
+      ? `${activeAlerts.length} 条活跃 · ${breachedCount} 条已触达`
       : "等待会话",
   );
   if (!botStrategyDirection) renderBotStrategySummary(data.strategy || {});
@@ -718,7 +723,6 @@ function renderBotAlerts(data) {
   }
 
   const list = $("bot-alert-list");
-  const alerts = data.alerts || [];
   if (!list) return;
   if (!botSelectedChatId) {
     list.innerHTML = "<p>还没有机器人会话。先在企业微信群里 @机器人 发送“黄金 今日点位 A B C D”，这里就会出现这个群。</p>";
@@ -726,25 +730,43 @@ function renderBotAlerts(data) {
     return;
   }
   if (!alerts.length) {
-    list.innerHTML = "<p>当前会话今天没有活跃点位。</p>";
+    list.innerHTML = "<p>当前会话今天还没有点位记录。</p>";
     return;
   }
+  const statusLabels = {
+    active: "监控中",
+    breached: "已触达",
+    expired: "已过期",
+    replaced: "已覆盖",
+    cancelled: "已取消",
+  };
   list.innerHTML = alerts.map((alert) => {
     const distance = Number(alert.distance || Math.abs((data.current_price || 0) - alert.level));
     const sideLabel = alert.side === "above" ? "上方" : alert.side === "below" ? "下方" : "当前";
+    const status = statusLabels[alert.status] || alert.status || "未知";
+    const statusTime = alert.status === "breached"
+      ? strategyTimestampLabel(alert.breached_at)
+      : alert.status === "active"
+        ? `距离 ${distance.toFixed(2)}`
+        : strategyTimestampLabel(alert.created_at);
+    const reminderTime = alert.last_alert_at
+      ? `最后 ${strategyTimestampLabel(alert.last_alert_at)}`
+      : "尚未提醒";
     return `
-      <div class="bot-alert-row">
+      <div class="bot-alert-row ${escapeHtml(alert.status || "active")}">
         <div class="${alert.side}">
           <span>${sideLabel}点位</span>
           <strong>${priceFormat.format(alert.level)}</strong>
         </div>
-        <div class="${distance <= 3 ? "near" : ""}">
-          <span>距离</span>
-          <strong>${distance.toFixed(2)}</strong>
+        <div class="bot-alert-status ${escapeHtml(alert.status || "active")}">
+          <span>状态</span>
+          <strong>${escapeHtml(status)}</strong>
+          <small>${escapeHtml(statusTime)}</small>
         </div>
         <div>
           <span>提醒</span>
           <strong>${alert.alerts_sent}/${alert.alert_limit}</strong>
+          <small>${escapeHtml(reminderTime)}</small>
         </div>
         <div>
           <span>创建价</span>

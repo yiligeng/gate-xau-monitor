@@ -1050,6 +1050,23 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   font-size: 13px;
   font-variant-numeric: tabular-nums;
 }
+.bot-alert-row small,
+.bot-trial small {
+  display: block;
+  margin-top: 3px;
+  color: #687174;
+  font-size: 8px;
+  line-height: 1.35;
+}
+.bot-alert-row.breached {
+  border-color: rgba(233,185,73,.18);
+  background: rgba(233,185,73,.025);
+}
+.bot-alert-status.active strong { color: var(--green); }
+.bot-alert-status.breached strong { color: var(--gold); }
+.bot-alert-status.expired strong,
+.bot-alert-status.replaced strong,
+.bot-alert-status.cancelled strong { color: #7d8689; }
 .bot-alert-row .near strong { color: var(--gold); }
 .bot-alert-row .above strong { color: var(--red); }
 .bot-alert-row .below strong { color: var(--green); }
@@ -1284,6 +1301,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .bot-trial .win strong { color: var(--green); }
 .bot-trial .loss strong { color: var(--red); }
 .bot-trial .open strong { color: var(--gold); }
+.bot-trial .ambiguous strong { color: #d7adff; }
 .bot-strategy-pagination {
   display: flex;
   align-items: center;

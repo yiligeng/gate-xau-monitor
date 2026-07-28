@@ -59,7 +59,7 @@ def help_message() -> str:
             "- 黄金 / XAU：查看 XAUUSD 快照",
             "- BTC：查看 BTCUSDT 永续快照",
             "- 黄金 今日点位 4093.67 4087.70：设置今天24点前有效的提醒",
-            "- 黄金 点位：查看今天还活着的提醒",
+            "- 黄金 点位：查看今天全部提醒记录（含已触达）",
             "- 黄金 取消今日点位：清空今天的提醒",
             "- 黄金 胜率：查看正负5美元策略的长期统计",
             "- 帮助：查看这份菜单",
@@ -216,6 +216,7 @@ def format_strategy_stats(
         (
             f"持仓中：{int(stats.get('open') or 0)}  "
             f"待触发：{int(stats.get('pending') or 0)}  "
+            f"顺序待复核：{int(stats.get('ambiguous') or 0)}  "
             f"未触发到期：{int(stats.get('expired') or 0)}"
         ),
         (
@@ -235,7 +236,8 @@ def format_strategy_stats(
         [
             "",
             "口径：下方点位做多、上方点位做空；触发后止盈/止损各5美元。",
-            "仅按Gate最新价判断，不含点差、滑点和手续费，不代表实际净收益。",
+            "Gate实时价与1秒K线共同校验；同秒先后不明不计胜负。",
+            "不含点差、滑点和手续费，不代表实际净收益。",
         ]
     )
     return "\n".join(lines)
@@ -306,13 +308,21 @@ def _handle_alert_command(
         chat_id = extract_chat_id(frame)
         if not chat_id:
             return "没有拿到当前会话ID，暂时不能查看点位。"
-        rows = alert_store.active_alerts(chat_id, market_id)
+        rows = alert_store.today_alerts(chat_id, market_id)
         if not rows:
-            return f"{market_display_name(market_id)} 今天没有活跃点位。"
-        lines = [f"{market_display_name(market_id)} 今日活跃点位："]
+            return f"{market_display_name(market_id)} 今天没有点位记录。"
+        status_labels = {
+            "active": "监控中",
+            "breached": "已触达",
+            "expired": "已过期",
+            "replaced": "已覆盖",
+            "cancelled": "已取消",
+        }
+        lines = [f"{market_display_name(market_id)} 今日点位记录："]
         for row in rows:
             lines.append(
-                f"- {row['level']:,.2f}，已提醒 "
+                f"- {row['level']:,.2f}，"
+                f"{status_labels.get(row['status'], row['status'])}，已提醒 "
                 f"{row['alerts_sent']}/{row['alert_limit']} 次"
             )
         lines.append(
@@ -436,9 +446,48 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
                     )
             await asyncio.sleep(0.1)
 
+    async def wick_reconciliation_loop() -> None:
+        if alert_store is None:
+            return
+        candle_client = GateTradFiClient(timeout=8.0, retries=1)
+        consecutive_errors = 0
+        while True:
+            try:
+                candles = await asyncio.to_thread(
+                    candle_client.candles,
+                    "XAUUSD",
+                    "1s",
+                    200,
+                )
+                result = await asyncio.to_thread(
+                    alert_store.reconcile_strategy_candles,
+                    "xau",
+                    candles,
+                )
+                consecutive_errors = 0
+                if any(result.values()):
+                    print(
+                        "黄金1秒插针校验："
+                        f"入场 {result['opened']}，"
+                        f"胜 {result['won']}，"
+                        f"负 {result['lost']}，"
+                        f"待复核 {result['ambiguous']}。",
+                        flush=True,
+                    )
+            except Exception as exc:
+                consecutive_errors += 1
+                if consecutive_errors == 1 or consecutive_errors % 60 == 0:
+                    print(
+                        "黄金1秒插针校验暂不可用："
+                        f"{type(exc).__name__}",
+                        flush=True,
+                    )
+            await asyncio.sleep(1.0)
+
     async def main() -> None:
         await ws_client.connect()
         asyncio.create_task(alert_loop())
+        asyncio.create_task(wick_reconciliation_loop())
         await asyncio.Event().wait()
 
     loop = asyncio.new_event_loop()

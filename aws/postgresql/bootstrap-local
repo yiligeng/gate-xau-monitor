@@ -86,6 +86,31 @@ if [[ "${#migration_files[@]}" -eq 0 ]]; then
   exit 1
 fi
 for migration_file in "${migration_files[@]}"; do
+  migration_name="$(basename "${migration_file}")"
+  if [[ ! "${migration_name}" =~ ^([0-9]{3})_ ]]; then
+    echo "Invalid migration filename: ${migration_name}" >&2
+    exit 1
+  fi
+  migration_version="$((10#${BASH_REMATCH[1]}))"
+  migration_table_exists="$(
+    runuser -u postgres -- psql \
+      --quiet \
+      --tuples-only \
+      --no-align \
+      --dbname="${database_name}" \
+      --command="SELECT to_regclass('app.schema_migrations') IS NOT NULL"
+  )"
+  if [[ "${migration_table_exists}" == "t" ]] &&
+    runuser -u postgres -- psql \
+      --quiet \
+      --tuples-only \
+      --no-align \
+      --dbname="${database_name}" \
+      --command="SELECT 1 FROM app.schema_migrations WHERE version = ${migration_version}" |
+      grep -qx 1; then
+    printf 'Skipping applied migration %s\n' "${migration_name}"
+    continue
+  fi
   runuser -u postgres -- psql \
     --set=ON_ERROR_STOP=1 \
     --dbname="${database_name}" \

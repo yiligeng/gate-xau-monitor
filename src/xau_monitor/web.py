@@ -598,21 +598,37 @@ def make_handler(
                     for chat in payload["chats"]
                 ],
                 "alerts": [
-                    {
-                        "id": alert["id"],
-                        "level": alert["level"],
-                        "created_price": alert["created_price"],
-                        "side": alert["side"],
-                        "alerts_sent": alert["alerts_sent"],
-                        "alert_limit": alert["alert_limit"],
-                        "distance": alert.get("distance"),
-                        "expires_at": alert["expires_at"].isoformat(),
-                        "strategy": alert.get("strategy"),
-                    }
+                    self._serialize_alert(alert)
                     for alert in payload["alerts"]
+                ],
+                "today_alerts": [
+                    self._serialize_alert(alert)
+                    for alert in payload.get("today_alerts", payload["alerts"])
                 ],
                 "strategy": self._serialize_strategy_stats(payload["strategy"]),
             }
+
+        def _serialize_alert(self, alert: dict[str, Any]) -> dict[str, Any]:
+            result = {
+                "id": alert["id"],
+                "level": alert["level"],
+                "created_price": alert["created_price"],
+                "side": alert["side"],
+                "alerts_sent": alert["alerts_sent"],
+                "alert_limit": alert["alert_limit"],
+                "distance": alert.get("distance"),
+                "status": alert.get("status", "active"),
+                "strategy": alert.get("strategy"),
+            }
+            for key in (
+                "expires_at",
+                "created_at",
+                "last_alert_at",
+                "breached_at",
+            ):
+                value = alert.get(key)
+                result[key] = value.isoformat() if value else None
+            return result
 
         def _serialize_strategy_stats(
             self,

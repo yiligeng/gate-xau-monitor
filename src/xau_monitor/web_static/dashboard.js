@@ -219,6 +219,7 @@ let latestPayload = null;
 let latestScalpResult = null;
 let lastChartSignature = "";
 let chartMode = "1m";
+let chartFocusMs = null;
 let quoteTimer = null;
 let snapshotTimer = null;
 let botAlertsTimer = null;
@@ -365,6 +366,12 @@ function toTimelineItem(kind, item, index) {
   return { kind, item, index, startMs, endMs };
 }
 
+function itemContainsMs(timelineItem, ms) {
+  return Number.isFinite(ms)
+    && timelineItem.startMs <= ms
+    && timelineItem.endMs >= ms;
+}
+
 function timelineBounds(items) {
   const validItems = items.filter(Boolean);
   if (!validItems.length) return null;
@@ -442,14 +449,15 @@ function renderTimelineTicks(bounds) {
   return ticks.join("");
 }
 
-function timelineItemHtml(timelineItem) {
+function timelineItemHtml(timelineItem, focusMs) {
   const { kind, item, index } = timelineItem;
   const helpKey = registerCalendarHelp(kind, item, index);
   const tone = eventToneClass(item.impact);
   const style = timelineItemStyle(timelineItem);
+  const focusClass = itemContainsMs(timelineItem, focusMs) ? "chart-focus" : "";
   if (kind === "event") {
     return `
-      <div class="timeline-item event ${tone} ${item.status}" style="${style}">
+      <div class="timeline-item event ${tone} ${item.status} ${focusClass}" style="${style}">
         <div class="calendar-chip-top">
           <span>${escapeHtml(item.title)}</span>
           <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
@@ -464,7 +472,7 @@ function timelineItemHtml(timelineItem) {
       ? "高波动时段"
       : "震荡窗口";
   return `
-    <div class="timeline-item ${kind} ${tone} ${item.status}" style="${style}">
+    <div class="timeline-item ${kind} ${tone} ${item.status} ${focusClass}" style="${style}">
       <div class="calendar-chip-top">
         <span>${escapeHtml(item.title)}</span>
         <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
@@ -474,7 +482,7 @@ function timelineItemHtml(timelineItem) {
   `;
 }
 
-function renderTimelineRow(targetId, items, bounds, emptyText) {
+function renderTimelineRow(targetId, items, bounds, emptyText, focusMs) {
   const target = $(targetId);
   if (!target) return { laneCount: 1, maxRightPx: 0 };
   if (!items.length || !bounds) {
@@ -490,21 +498,21 @@ function renderTimelineRow(targetId, items, bounds, emptyText) {
   const laneCount = Math.max(...packed.map((item) => item.lane)) + 1;
   target.style.setProperty("--lane-count", String(laneCount));
   target.style.height = `${laneCount * CALENDAR_LANE_HEIGHT}px`;
-  target.innerHTML = packed.map((item) => timelineItemHtml(item)).join("");
+  target.innerHTML = packed.map((item) => timelineItemHtml(item, focusMs)).join("");
   return { laneCount, maxRightPx };
 }
 
-function timelineFocusLeft(items, bounds) {
+function timelineFocusLeft(items, bounds, focusMs = null) {
   if (!bounds || !items.length) return 0;
-  const now = Date.now();
   const sorted = [...items].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
-  const active = sorted.find((item) => item.startMs <= now && item.endMs >= now);
-  const next = sorted.find((item) => item.startMs >= now);
+  const targetMs = Number.isFinite(focusMs) ? focusMs : Date.now();
+  const active = sorted.find((item) => itemContainsMs(item, targetMs));
+  const next = sorted.find((item) => item.startMs >= targetMs);
   const target = active || next || sorted[0];
   return Math.max(0, timelineLeftPx(target.startMs, bounds) - 28);
 }
 
-function renderMarketCalendar(calendar) {
+function renderMarketCalendar(calendar, focusMs = null) {
   const container = $("market-calendar");
   if (!container || !calendar) return;
   setText("calendar-date", `${formatCalendarDate(calendar.date)} · 北京时间`);
@@ -547,12 +555,14 @@ function renderMarketCalendar(calendar) {
     topItems,
     bounds,
     "今日/今夜暂无重大事件或高波动时段。",
+    focusMs,
   );
   const rangeRow = renderTimelineRow(
     "calendar-windows",
     rangeItems,
     bounds,
     "今日暂无震荡窗口，仍以实时形态为准。",
+    focusMs,
   );
   if (timeline) {
     const contentWidth = Math.ceil(Math.max(
@@ -570,7 +580,7 @@ function renderMarketCalendar(calendar) {
   if (scroll && bounds) {
     const focusKey = `${bounds.startMs}:${bounds.endMs}:${topItems.length}:${rangeItems.length}`;
     if (container.dataset.timelineFocusKey !== focusKey) {
-      scroll.scrollLeft = timelineFocusLeft([...topItems, ...rangeItems], bounds);
+      scroll.scrollLeft = timelineFocusLeft([...topItems, ...rangeItems], bounds, focusMs);
       container.dataset.timelineFocusKey = focusKey;
     }
   }
@@ -2329,6 +2339,21 @@ function mergeLiveCandle(candles, ticks, intervalSeconds) {
   return merged;
 }
 
+function chartFocusTimestampMs(data) {
+  if (chartMode === "tick") {
+    const timestampMs = Number(data?.ticks?.at(-1)?.timestamp_ms);
+    return Number.isFinite(timestampMs) ? timestampMs : null;
+  }
+  const intervalSeconds = chartMode === "1m" ? 60 : 300;
+  const liveCandles = mergeLiveCandle(
+    data?.candles?.[chartMode] || [],
+    data?.ticks || [],
+    intervalSeconds,
+  );
+  const timestamp = Number(liveCandles.at(-1)?.timestamp);
+  return Number.isFinite(timestamp) ? timestamp * 1000 : null;
+}
+
 function drawSelectedChart(data, force = false) {
   const support = Number(data.frames?.["1m"]?.support);
   const resistance = Number(data.frames?.["1m"]?.resistance);
@@ -2355,6 +2380,7 @@ function drawSelectedChart(data, force = false) {
     : null;
   if (chartMode === "tick") {
     const ticks = data.ticks || [];
+    chartFocusMs = chartFocusTimestampMs(data);
     const signature = ticks.length ? `${ticks.at(-1).timestamp_ms}:${ticks.length}` : "";
     if (force || signature !== lastChartSignature) {
       drawTickChart(ticks, supportZone, resistanceZone);
@@ -2369,6 +2395,9 @@ function drawSelectedChart(data, force = false) {
     intervalSeconds,
   );
   const current = liveCandles.at(-1);
+  chartFocusMs = Number.isFinite(Number(current?.timestamp))
+    ? Number(current.timestamp) * 1000
+    : chartFocusMs;
   const settingsSignature = Object.entries(enabledIndicators)
     .map(([key, value]) => `${key}:${value ? 1 : 0}`)
     .join(",");
@@ -2382,6 +2411,11 @@ function drawSelectedChart(data, force = false) {
     );
   }
   lastChartSignature = signature;
+}
+
+function redrawChartAndCalendar(data, force = true) {
+  drawSelectedChart(data, force);
+  renderMarketCalendar(data.market_calendar, chartFocusMs);
 }
 
 function render(data) {
@@ -2432,7 +2466,8 @@ function render(data) {
 
   renderFrames(data.frames);
   renderVolume(data.volume_proxy, data.live_volume);
-  renderMarketCalendar(data.market_calendar);
+  chartFocusMs = chartFocusTimestampMs(data);
+  renderMarketCalendar(data.market_calendar, chartFocusMs);
   renderScalpStrategy(data);
   drawSelectedChart(data);
 
@@ -2486,7 +2521,7 @@ async function refreshQuote() {
 }
 
 window.addEventListener("resize", () => {
-  if (latestPayload) drawSelectedChart(latestPayload, true);
+  if (latestPayload) redrawChartAndCalendar(latestPayload, true);
 });
 
 document.querySelectorAll(".chart-mode").forEach((button) => {
@@ -2497,7 +2532,7 @@ document.querySelectorAll(".chart-mode").forEach((button) => {
     });
     setText("chart-title", chartMode === "tick" ? "Tick 实时报价" : `${chartMode === "1m" ? "1分钟" : "5分钟"} K线`);
     lastChartSignature = "";
-    if (latestPayload) drawSelectedChart(latestPayload, true);
+    if (latestPayload) redrawChartAndCalendar(latestPayload, true);
   });
 });
 
@@ -2615,7 +2650,7 @@ function initializeStrategyControls() {
       enabledIndicators[input.dataset.indicator] = input.checked;
       saveStrategySettings();
       lastChartSignature = "";
-      if (latestPayload) drawSelectedChart(latestPayload, true);
+      if (latestPayload) redrawChartAndCalendar(latestPayload, true);
     });
   });
   master.addEventListener("change", () => {
@@ -2624,7 +2659,7 @@ function initializeStrategyControls() {
       .classList.toggle("disabled", !strategyEnabled);
     saveStrategySettings();
     lastChartSignature = "";
-    if (latestPayload) drawSelectedChart(latestPayload, true);
+    if (latestPayload) redrawChartAndCalendar(latestPayload, true);
   });
   $("price-chart").closest(".chart-card").querySelector(".strategy-bar")
     .classList.toggle("disabled", !strategyEnabled);

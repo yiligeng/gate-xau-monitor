@@ -323,6 +323,155 @@ function registerCalendarHelp(kind, item, index) {
   return key;
 }
 
+const CALENDAR_MIN_CARD_MINUTES = 48;
+
+function calendarStartMs(item) {
+  const value = item?.start || item?.time;
+  const parsed = Date.parse(value || "");
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function calendarEndMs(item) {
+  const startMs = calendarStartMs(item);
+  if (startMs === null) return null;
+  const parsedEnd = Date.parse(item?.end || "");
+  if (Number.isFinite(parsedEnd) && parsedEnd > startMs) return parsedEnd;
+  return startMs + 30 * 60 * 1000;
+}
+
+function floorHour(ms) {
+  const date = new Date(ms);
+  date.setMinutes(0, 0, 0);
+  return date.getTime();
+}
+
+function ceilHour(ms) {
+  const date = new Date(ms);
+  date.setMinutes(0, 0, 0);
+  if (date.getTime() < ms) date.setHours(date.getHours() + 1);
+  return date.getTime();
+}
+
+function toTimelineItem(kind, item, index) {
+  const startMs = calendarStartMs(item);
+  const endMs = calendarEndMs(item);
+  if (startMs === null || endMs === null) return null;
+  return { kind, item, index, startMs, endMs };
+}
+
+function timelineBounds(items) {
+  const validItems = items.filter(Boolean);
+  if (!validItems.length) return null;
+  const startMs = floorHour(Math.min(...validItems.map((item) => item.startMs)));
+  const endMs = ceilHour(Math.max(...validItems.map((item) => item.endMs)));
+  return { startMs, endMs: Math.max(endMs, startMs + 60 * 60 * 1000) };
+}
+
+function timelinePercent(ms, bounds) {
+  const span = Math.max(bounds.endMs - bounds.startMs, 1);
+  return ((ms - bounds.startMs) / span) * 100;
+}
+
+function packTimelineItems(items) {
+  const lanes = [];
+  return [...items]
+    .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
+    .map((item) => {
+      const visibleEnd = Math.max(
+        item.endMs,
+        item.startMs + CALENDAR_MIN_CARD_MINUTES * 60 * 1000,
+      );
+      let lane = lanes.findIndex((endMs) => endMs <= item.startMs);
+      if (lane === -1) {
+        lane = lanes.length;
+        lanes.push(visibleEnd);
+      } else {
+        lanes[lane] = visibleEnd;
+      }
+      return { ...item, lane };
+    });
+}
+
+function timelineItemStyle(timelineItem, bounds) {
+  const left = timelinePercent(timelineItem.startMs, bounds);
+  const width = Math.max(
+    timelinePercent(timelineItem.endMs, bounds) - left,
+    0.4,
+  );
+  const top = timelineItem.lane * 86 + 7;
+  return `--left:${left.toFixed(3)}%;--width:${width.toFixed(3)}%;--top:${top}px;`;
+}
+
+function renderTimelineTicks(bounds) {
+  if (!bounds) return "";
+  const ticks = [];
+  for (let ms = bounds.startMs; ms <= bounds.endMs; ms += 60 * 60 * 1000) {
+    const left = timelinePercent(ms, bounds);
+    const label = new Date(ms).toLocaleTimeString("zh-CN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Shanghai",
+    });
+    ticks.push(`
+      <span class="timeline-tick" style="--left:${left.toFixed(3)}%;">
+        <i></i>
+        <small>${escapeHtml(label)}</small>
+      </span>
+    `);
+  }
+  return ticks.join("");
+}
+
+function timelineItemHtml(timelineItem, bounds) {
+  const { kind, item, index } = timelineItem;
+  const helpKey = registerCalendarHelp(kind, item, index);
+  const tone = eventToneClass(item.impact);
+  const style = timelineItemStyle(timelineItem, bounds);
+  if (kind === "event") {
+    return `
+      <div class="timeline-item event ${tone} ${item.status}" style="${style}">
+        <div class="calendar-chip-top">
+          <time>${escapeHtml(item.time_label)}</time>
+          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
+        </div>
+        <strong>${escapeHtml(item.title)}</strong>
+        <span>${escapeHtml(item.impact)} · ${escapeHtml(item.source)}</span>
+      </div>
+    `;
+  }
+  const typeLabel = kind === "event_window"
+    ? "事件风险窗"
+    : kind === "volatility"
+      ? "高波动时段"
+      : "震荡窗口";
+  return `
+    <div class="timeline-item ${kind} ${tone} ${item.status}" style="${style}">
+      <div class="calendar-chip-top">
+        <span>${escapeHtml(item.title)}</span>
+        <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
+      </div>
+      <strong>${escapeHtml(item.time_label)}</strong>
+      <small>${escapeHtml(typeLabel)} · ${escapeHtml(item.note)}</small>
+    </div>
+  `;
+}
+
+function renderTimelineRow(targetId, items, bounds, emptyText) {
+  const target = $(targetId);
+  if (!target) return 1;
+  if (!items.length || !bounds) {
+    target.style.setProperty("--lane-count", "1");
+    target.innerHTML = `<p>${escapeHtml(emptyText)}</p>`;
+    return 1;
+  }
+  const packed = packTimelineItems(items);
+  const laneCount = Math.max(...packed.map((item) => item.lane)) + 1;
+  target.style.setProperty("--lane-count", String(laneCount));
+  target.innerHTML = packed.map((item) => timelineItemHtml(item, bounds)).join("");
+  return laneCount;
+}
+
 function renderMarketCalendar(calendar) {
   const container = $("market-calendar");
   if (!container || !calendar) return;
@@ -333,75 +482,49 @@ function renderMarketCalendar(calendar) {
     : [];
   const eventWindows = Array.isArray(calendar.event_windows) ? calendar.event_windows : [];
   const events = Array.isArray(calendar.events) ? calendar.events : [];
+  const topItems = [
+    ...volatilityWindows.map((item, index) => toTimelineItem("volatility", item, index)),
+    ...eventWindows.map((item, index) => toTimelineItem("event_window", item, index)),
+    ...events.map((item, index) => toTimelineItem("event", item, index)),
+  ].filter(Boolean);
+  const rangeItems = windows
+    .map((item, index) => toTimelineItem("window", item, index))
+    .filter(Boolean);
+  const bounds = timelineBounds([...topItems, ...rangeItems]);
   setText(
     "calendar-event-summary",
+    "上轨按北京时间排序；红色容易单边，金色是高波动，不按震荡窗口处理。",
+  );
+  setText(
+    "calendar-risk-summary",
     eventWindows.length || events.length
-      ? `${calendar.summary || "今日有重大事件。"} 重大事件容易单边，不按震荡窗口处理。`
-      : "今日/今夜暂无重大事件，重点看窗口时间。",
+      ? `${calendar.summary || "今日有重大事件。"} 高波动时段只做风险提示。`
+      : "无重大事件时，仍把高波动时段作为风险提示。",
   );
   setText(
     "calendar-window-summary",
     "只放吃饭等低流动性时段；绿色=震荡/假突破窗口。",
   );
-  setText(
-    "calendar-volatility-summary",
-    "伦敦启动、定盘、美国数据、纽约主波动；更容易放大波动，不等于震荡窗口。",
+  $("calendar-ticks").innerHTML = renderTimelineTicks(bounds);
+  const riskLaneCount = renderTimelineRow(
+    "calendar-events",
+    topItems,
+    bounds,
+    "今日/今夜暂无重大事件或高波动时段。",
   );
-  const eventWindowCards = eventWindows.map((eventWindow, index) => {
-    const helpKey = registerCalendarHelp("event_window", eventWindow, index);
-    return `
-      <div class="event-chip event-window ${eventToneClass(eventWindow.impact)} ${eventWindow.status}">
-        <div class="calendar-chip-top">
-          <span>${escapeHtml(eventWindow.title)}</span>
-          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(eventWindow.title)}说明">i</button>
-        </div>
-        <strong>${escapeHtml(eventWindow.time_label)}</strong>
-        <span>${escapeHtml(eventWindow.impact)} · 事件风险窗</span>
-      </div>
-    `;
-  }).join("");
-  const eventCards = events.map((event, index) => {
-    const helpKey = registerCalendarHelp("event", event, index);
-    return `
-      <div class="event-chip ${eventToneClass(event.impact)} ${event.status}">
-        <div class="calendar-chip-top">
-          <time>${escapeHtml(event.time_label)}</time>
-          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(event.title)}说明">i</button>
-        </div>
-        <strong>${escapeHtml(event.title)}</strong>
-        <span>${escapeHtml(event.impact)} · ${escapeHtml(event.source)}</span>
-      </div>
-    `;
-  }).join("");
-  $("calendar-events").innerHTML = eventWindowCards || eventCards
-    ? eventWindowCards + eventCards
-    : `<p>今日/今夜暂无重大事件；震荡策略仍以震荡窗口和实时形态为准。</p>`;
-  $("calendar-windows").innerHTML = windows.map((windowItem, index) => {
-    const helpKey = registerCalendarHelp("window", windowItem, index);
-    return `
-    <div class="calendar-chip ${eventToneClass(windowItem.impact)} ${windowItem.status}">
-      <div class="calendar-chip-top">
-        <span>${escapeHtml(windowItem.title)}</span>
-        <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(windowItem.title)}说明">i</button>
-      </div>
-      <strong>${escapeHtml(windowItem.time_label)}</strong>
-      <small>${escapeHtml(windowItem.note)}</small>
-    </div>
-  `;
-  }).join("");
-  $("calendar-volatility").innerHTML = volatilityWindows.map((windowItem, index) => {
-    const helpKey = registerCalendarHelp("volatility", windowItem, index);
-    return `
-    <div class="calendar-chip volatility-chip ${eventToneClass(windowItem.impact)} ${windowItem.status}">
-      <div class="calendar-chip-top">
-        <span>${escapeHtml(windowItem.title)}</span>
-        <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(windowItem.title)}说明">i</button>
-      </div>
-      <strong>${escapeHtml(windowItem.time_label)}</strong>
-      <small>${escapeHtml(windowItem.note)}</small>
-    </div>
-  `;
-  }).join("");
+  const rangeLaneCount = renderTimelineRow(
+    "calendar-windows",
+    rangeItems,
+    bounds,
+    "今日暂无震荡窗口，仍以实时形态为准。",
+  );
+  const timeline = $("calendar-timeline");
+  if (timeline) {
+    timeline.style.setProperty(
+      "--tick-height",
+      `${56 + riskLaneCount * 86 + rangeLaneCount * 86}px`,
+    );
+  }
 }
 
 function closeStrategyHelp() {

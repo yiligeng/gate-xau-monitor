@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=25">
+    <link rel="stylesheet" href="/dashboard.css?v=26">
   </head>
   <body>
     <main class="shell">
@@ -105,32 +105,28 @@
             <span>北京时间</span>
             <time id="calendar-date">--</time>
           </div>
-          <section class="calendar-section events-section" aria-label="今日重大事件">
+          <section class="calendar-section timeline-section" aria-label="今日时间轴">
             <div class="calendar-head">
               <div>
-                <span>重大事件</span>
-                <strong id="calendar-event-summary">正在加载重大事件</strong>
+                <span>时间轴</span>
+                <strong id="calendar-event-summary">正在加载重大事件与高波动时段</strong>
               </div>
             </div>
-            <div id="calendar-events" class="calendar-events"></div>
-          </section>
-          <section class="calendar-section range-section" aria-label="今日震荡窗口">
-            <div class="calendar-head">
-              <div>
-                <span>震荡窗口</span>
-                <strong id="calendar-window-summary">只放低流动性、容易假突破的窗口</strong>
+            <div id="calendar-timeline-scroll" class="calendar-timeline-scroll">
+              <div id="calendar-timeline" class="calendar-timeline">
+                <div id="calendar-ticks" class="calendar-ticks"></div>
+                <div class="timeline-row-title">
+                  <span>重大事件 / 高波动时段</span>
+                  <small id="calendar-risk-summary">容易单边或放大波动</small>
+                </div>
+                <div id="calendar-events" class="timeline-row risk-row"></div>
+                <div class="timeline-row-title range-title">
+                  <span>震荡窗口</span>
+                  <small id="calendar-window-summary">只放低流动性、容易假突破的窗口</small>
+                </div>
+                <div id="calendar-windows" class="timeline-row range-row"></div>
               </div>
             </div>
-            <div id="calendar-windows" class="calendar-windows"></div>
-          </section>
-          <section class="calendar-section volatility-section" aria-label="今日高波动时段">
-            <div class="calendar-head">
-              <div>
-                <span>高波动时段</span>
-                <strong id="calendar-volatility-summary">流动性进场或数据窗口，不按震荡窗口处理</strong>
-              </div>
-            </div>
-            <div id="calendar-volatility" class="calendar-volatility"></div>
           </section>
         </div>
         <div class="strategy-bar">
@@ -559,6 +555,6 @@
       <code id="strategy-help-formula"></code>
       <a id="strategy-help-link" class="help-link" href="#" rel="noopener noreferrer" hidden>查看来源</a>
     </div>
-    <script src="/dashboard.js?v=25"></script>
+    <script src="/dashboard.js?v=26"></script>
   </body>
 </html>

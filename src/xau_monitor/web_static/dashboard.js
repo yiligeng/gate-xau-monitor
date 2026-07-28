@@ -395,24 +395,18 @@ function timelineCardWidthPx(item) {
 }
 
 function packTimelineItems(items, bounds) {
-  const lanes = [];
+  let nextLeftPx = 0;
   return [...items]
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
     .map((item) => {
-      const leftPx = timelineLeftPx(item.startMs, bounds);
+      const timeLeftPx = timelineLeftPx(item.startMs, bounds);
       const widthPx = Math.max(
         timelineCardWidthPx(item),
         (CALENDAR_MIN_CARD_MINUTES / 60) * CALENDAR_PIXELS_PER_HOUR,
       );
-      const rightPx = leftPx + widthPx + CALENDAR_CARD_GAP;
-      let lane = lanes.findIndex((laneRightPx) => laneRightPx <= leftPx);
-      if (lane === -1) {
-        lane = lanes.length;
-        lanes.push(rightPx);
-      } else {
-        lanes[lane] = rightPx;
-      }
-      return { ...item, lane, leftPx, widthPx };
+      const leftPx = Math.max(timeLeftPx, nextLeftPx);
+      nextLeftPx = leftPx + widthPx + CALENDAR_CARD_GAP;
+      return { ...item, lane: 0, leftPx, timeLeftPx, widthPx };
     });
 }
 
@@ -478,19 +472,21 @@ function timelineItemHtml(timelineItem) {
 
 function renderTimelineRow(targetId, items, bounds, emptyText) {
   const target = $(targetId);
-  if (!target) return 1;
+  if (!target) return { laneCount: 1, maxRightPx: 0 };
   if (!items.length || !bounds) {
     target.style.setProperty("--lane-count", "1");
     target.style.height = `${CALENDAR_LANE_HEIGHT}px`;
     target.innerHTML = `<p>${escapeHtml(emptyText)}</p>`;
-    return 1;
+    return { laneCount: 1, maxRightPx: 0 };
   }
   const packed = packTimelineItems(items, bounds);
-  const laneCount = Math.max(...packed.map((item) => item.lane)) + 1;
-  target.style.setProperty("--lane-count", String(laneCount));
-  target.style.height = `${laneCount * CALENDAR_LANE_HEIGHT}px`;
+  const maxRightPx = Math.max(
+    ...packed.map((item) => item.leftPx + item.widthPx + CALENDAR_CARD_GAP),
+  );
+  target.style.setProperty("--lane-count", "1");
+  target.style.height = `${CALENDAR_LANE_HEIGHT}px`;
   target.innerHTML = packed.map((item) => timelineItemHtml(item)).join("");
-  return laneCount;
+  return { laneCount: 1, maxRightPx };
 }
 
 function timelineFocusLeft(items, bounds) {
@@ -528,7 +524,7 @@ function renderMarketCalendar(calendar) {
   }
   setText(
     "calendar-event-summary",
-    "上轨按北京时间排序；红色容易单边，金色是高波动，不按震荡窗口处理。",
+    "上轨按北京时间排序；卡片碰撞时会横向避让，不按震荡窗口处理。",
   );
   setText(
     "calendar-risk-summary",
@@ -541,22 +537,28 @@ function renderMarketCalendar(calendar) {
     "只放吃饭等低流动性时段；绿色=震荡/假突破窗口。",
   );
   $("calendar-ticks").innerHTML = renderTimelineTicks(bounds);
-  const riskLaneCount = renderTimelineRow(
+  const riskRow = renderTimelineRow(
     "calendar-events",
     topItems,
     bounds,
     "今日/今夜暂无重大事件或高波动时段。",
   );
-  const rangeLaneCount = renderTimelineRow(
+  const rangeRow = renderTimelineRow(
     "calendar-windows",
     rangeItems,
     bounds,
     "今日暂无震荡窗口，仍以实时形态为准。",
   );
   if (timeline) {
+    const contentWidth = Math.ceil(Math.max(
+      timelineWidthPx(bounds),
+      riskRow.maxRightPx + 28,
+      rangeRow.maxRightPx + 28,
+    ));
+    timeline.style.setProperty("--timeline-width", `${contentWidth}px`);
     timeline.style.setProperty(
       "--tick-height",
-      `${56 + riskLaneCount * CALENDAR_LANE_HEIGHT + rangeLaneCount * CALENDAR_LANE_HEIGHT}px`,
+      `${56 + riskRow.laneCount * CALENDAR_LANE_HEIGHT + rangeRow.laneCount * CALENDAR_LANE_HEIGHT}px`,
     );
   }
   const scroll = $("calendar-timeline-scroll");

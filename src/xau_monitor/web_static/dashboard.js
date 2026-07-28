@@ -300,31 +300,57 @@ function formatCalendarDate(value) {
 function eventToneClass(impact) {
   if (impact === "最高+" || impact === "最高") return "critical";
   if (impact === "高") return "high";
+  if (impact === "震荡") return "range";
   return "medium";
+}
+
+function registerCalendarHelp(kind, item, index) {
+  const key = `calendar_${kind}_${index}`;
+  const label = kind === "event" ? "事件" : "窗口";
+  STRATEGY_HELP[key] = {
+    title: item.title || label,
+    body: `${item.time_label || "--"}。${item.note || "按北京时间观察价格反应。"}`,
+    formula: `${label}类型：${item.impact || "--"}${item.source ? ` · 来源：${item.source}` : ""}`,
+    link: item.source_url || "",
+    linkLabel: "查看来源",
+  };
+  return key;
 }
 
 function renderMarketCalendar(calendar) {
   const container = $("market-calendar");
   if (!container || !calendar) return;
   setText("calendar-date", `${formatCalendarDate(calendar.date)} · 北京时间`);
-  setText("calendar-summary", calendar.summary || "今日风险时间");
+  setText("calendar-summary", calendar.summary || "今日窗口时间");
   const windows = Array.isArray(calendar.windows) ? calendar.windows : [];
   const events = Array.isArray(calendar.events) ? calendar.events : [];
-  $("calendar-windows").innerHTML = windows.map((windowItem) => `
+  $("calendar-windows").innerHTML = windows.map((windowItem, index) => {
+    const helpKey = registerCalendarHelp("window", windowItem, index);
+    return `
     <div class="calendar-chip ${eventToneClass(windowItem.impact)} ${windowItem.status}">
-      <span>${escapeHtml(windowItem.title)}</span>
+      <div class="calendar-chip-top">
+        <span>${escapeHtml(windowItem.title)}</span>
+        <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(windowItem.title)}说明">i</button>
+      </div>
       <strong>${escapeHtml(windowItem.time_label)}</strong>
       <small>${escapeHtml(windowItem.note)}</small>
     </div>
-  `).join("");
+  `;
+  }).join("");
   $("calendar-events").innerHTML = events.length
-    ? events.map((event) => `
+    ? events.map((event, index) => {
+      const helpKey = registerCalendarHelp("event", event, index);
+      return `
       <div class="event-chip ${eventToneClass(event.impact)} ${event.status}">
-        <time>${escapeHtml(event.time_label)}</time>
+        <div class="calendar-chip-top">
+          <time>${escapeHtml(event.time_label)}</time>
+          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(event.title)}说明">i</button>
+        </div>
         <strong>${escapeHtml(event.title)}</strong>
         <span>${escapeHtml(event.impact)} · ${escapeHtml(event.source)}</span>
       </div>
-    `).join("")
+    `;
+    }).join("")
     : `<p>今日/今夜暂无最高级美国事件，重点看固定交易时段。</p>`;
 }
 
@@ -333,6 +359,11 @@ function closeStrategyHelp() {
   if (!popover) return;
   popover.classList.remove("open");
   popover.setAttribute("aria-hidden", "true");
+  const link = $("strategy-help-link");
+  if (link) {
+    link.hidden = true;
+    link.removeAttribute("href");
+  }
   delete popover.dataset.helpKey;
 }
 
@@ -347,6 +378,17 @@ function openStrategyHelp(key, anchor) {
   setText("strategy-help-title", help.title);
   setText("strategy-help-body", help.body);
   setText("strategy-help-formula", help.formula || "");
+  const link = $("strategy-help-link");
+  if (link) {
+    if (help.link) {
+      link.href = help.link;
+      link.textContent = help.linkLabel || "查看来源";
+      link.hidden = false;
+    } else {
+      link.hidden = true;
+      link.removeAttribute("href");
+    }
+  }
   popover.dataset.helpKey = key;
   popover.classList.add("open");
   popover.setAttribute("aria-hidden", "false");

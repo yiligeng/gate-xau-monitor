@@ -418,6 +418,17 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .calendar-chip.past,
 .event-chip.past { opacity: .48; }
+.calendar-chip-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.calendar-info {
+  width: 14px;
+  height: 14px;
+  font-size: 9px;
+}
 .calendar-chip span,
 .event-chip span,
 .calendar-chip small {
@@ -444,6 +455,9 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .event-chip.critical strong { color: var(--red); }
 .calendar-chip.high strong,
 .event-chip.high strong { color: var(--gold); }
+.calendar-chip.range .calendar-chip-top span,
+.calendar-chip.range strong,
+.event-chip.range strong { color: var(--green); }
 .calendar-events p {
   margin: 0;
   color: var(--muted);
@@ -957,6 +971,21 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   white-space: normal;
 }
 .help-popover code:empty { display: none; }
+.help-link {
+  display: inline-flex;
+  margin-top: 10px;
+  color: var(--gold);
+  font-size: 11px;
+  font-weight: 750;
+  text-decoration: none;
+}
+.help-link:hover,
+.help-link:focus-visible {
+  outline: 0;
+  color: #f2d786;
+  text-decoration: underline;
+}
+.help-link[hidden] { display: none; }
 .help-close {
   position: absolute;
   top: 7px;

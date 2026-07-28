@@ -10,6 +10,21 @@ SHANGHAI = ZoneInfo("Asia/Shanghai")
 NEW_YORK = ZoneInfo("America/New_York")
 LONDON = ZoneInfo("Europe/London")
 
+FED_CALENDAR_URL = "https://www.federalreserve.gov/newsevents/calendar.htm"
+BLS_SCHEDULE_URL = "https://www.bls.gov/schedule/2026/home.htm"
+BEA_SCHEDULE_URL = "https://www.bea.gov/news/schedule"
+ICE_LBMA_URL = "https://www.ice.com/iba/lbma-precious-metals"
+ISM_CALENDAR_URL = (
+    "https://www.ismworld.org/supply-management-news-and-reports/reports/"
+    "rob-report-calendar/"
+)
+SOURCE_URLS = {
+    "Federal Reserve": FED_CALENDAR_URL,
+    "BLS": BLS_SCHEDULE_URL,
+    "BEA": BEA_SCHEDULE_URL,
+    "ISM": ISM_CALENDAR_URL,
+}
+
 
 @dataclass(frozen=True)
 class EventSpec:
@@ -21,6 +36,7 @@ class EventSpec:
     source: str
     category: str
     note: str = ""
+    source_url: str = ""
 
 
 FOMC_DECISION_DATES = [
@@ -74,11 +90,72 @@ def market_calendar_payload(now: datetime | None = None) -> dict[str, Any]:
 def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
     local_day = now.astimezone(SHANGHAI).date()
     windows = [
-        _window_from_london(now, local_day, "伦敦盘启动", time(8, 0), time(10, 0), "中高", "欧洲流动性开始进场"),
-        _window_from_london(now, local_day, "LBMA 上午定盘", time(10, 25), time(10, 40), "中高", "伦敦黄金基准价附近"),
-        _window_from_london(now, local_day, "LBMA 下午定盘", time(14, 55), time(15, 10), "高", "伦敦下午定盘，常与纽约早盘重叠"),
-        _window_from_new_york(now, local_day, "美国数据窗", time(8, 25), time(8, 45), "最高", "多数美国重磅数据在 08:30 ET 公布"),
-        _window_from_new_york(now, local_day, "纽约主波动", time(9, 30), time(11, 30), "最高", "美股开盘后，美元/美债/COMEX 同时活跃"),
+        _window_from_london(
+            now,
+            local_day,
+            "伦敦盘启动",
+            time(8, 0),
+            time(10, 0),
+            "中高",
+            "欧洲流动性开始进场",
+        ),
+        _window_from_london(
+            now,
+            local_day,
+            "LBMA 上午定盘",
+            time(10, 25),
+            time(10, 40),
+            "中高",
+            "伦敦黄金基准价附近",
+            source_url=ICE_LBMA_URL,
+        ),
+        _window_from_london(
+            now,
+            local_day,
+            "英国午饭震荡窗",
+            time(12, 0),
+            time(13, 30),
+            "震荡",
+            "午间流动性回落，适合观察刺破后收回",
+        ),
+        _window_from_london(
+            now,
+            local_day,
+            "LBMA 下午定盘",
+            time(14, 55),
+            time(15, 10),
+            "高",
+            "伦敦下午定盘，常与纽约早盘重叠",
+            source_url=ICE_LBMA_URL,
+        ),
+        _window_from_new_york(
+            now,
+            local_day,
+            "美国数据窗",
+            time(8, 25),
+            time(8, 45),
+            "最高",
+            "多数美国重磅数据在 08:30 ET 公布",
+            source_url=BLS_SCHEDULE_URL,
+        ),
+        _window_from_new_york(
+            now,
+            local_day,
+            "纽约主波动",
+            time(9, 30),
+            time(11, 30),
+            "最高",
+            "美股开盘后，美元/美债/COMEX 同时活跃",
+        ),
+        _window_from_new_york(
+            now,
+            local_day,
+            "美国午饭震荡窗",
+            time(12, 0),
+            time(13, 30),
+            "震荡",
+            "美国午间深度变薄，突破更容易变成假突破",
+        ),
     ]
     events = today_event_list(now)
     if any(event["category"] == "fomc" for event in events):
@@ -93,6 +170,7 @@ def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
                 "最高+",
                 "声明和发布会会重新定价利率预期",
                 now,
+                source_url=FED_CALENDAR_URL,
             )
         )
     return sorted(windows, key=lambda item: item["start"])
@@ -223,13 +301,18 @@ def _first_monday(year: int, month: int) -> date:
 
 
 def _event_payload(spec: EventSpec, now: datetime) -> dict[str, Any]:
-    event_time = datetime.combine(spec.date, time(spec.hour, spec.minute), NEW_YORK).astimezone(SHANGHAI)
+    event_time = datetime.combine(
+        spec.date,
+        time(spec.hour, spec.minute),
+        NEW_YORK,
+    ).astimezone(SHANGHAI)
     return {
         "time": event_time.isoformat(),
         "time_label": event_time.strftime("%m/%d %H:%M"),
         "title": spec.title,
         "impact": spec.impact,
         "source": spec.source,
+        "source_url": spec.source_url or SOURCE_URLS.get(spec.source, ""),
         "category": spec.category,
         "note": spec.note,
         "status": _status_for(event_time, now),
@@ -244,11 +327,16 @@ def _window_from_new_york(
     end_time: time,
     impact: str,
     note: str,
+    source_url: str = "",
 ) -> dict[str, Any]:
-    ny_day = datetime.combine(local_day, time(12, 0), SHANGHAI).astimezone(NEW_YORK).date()
+    ny_day = datetime.combine(
+        local_day,
+        time(12, 0),
+        SHANGHAI,
+    ).astimezone(NEW_YORK).date()
     start = datetime.combine(ny_day, start_time, NEW_YORK).astimezone(SHANGHAI)
     end = datetime.combine(ny_day, end_time, NEW_YORK).astimezone(SHANGHAI)
-    return _window(title, start, end, impact, note, now)
+    return _window(title, start, end, impact, note, now, source_url=source_url)
 
 
 def _window_from_london(
@@ -259,10 +347,11 @@ def _window_from_london(
     end_time: time,
     impact: str,
     note: str,
+    source_url: str = "",
 ) -> dict[str, Any]:
     start = datetime.combine(local_day, start_time, LONDON).astimezone(SHANGHAI)
     end = datetime.combine(local_day, end_time, LONDON).astimezone(SHANGHAI)
-    return _window(title, start, end, impact, note, now)
+    return _window(title, start, end, impact, note, now, source_url=source_url)
 
 
 def _window(
@@ -272,6 +361,7 @@ def _window(
     impact: str,
     note: str,
     now: datetime,
+    source_url: str = "",
 ) -> dict[str, Any]:
     return {
         "title": title,
@@ -280,6 +370,7 @@ def _window(
         "time_label": f"{start:%H:%M}-{end:%H:%M}",
         "impact": impact,
         "note": note,
+        "source_url": source_url,
         "status": _window_status(start, end, now.astimezone(SHANGHAI)),
     }
 

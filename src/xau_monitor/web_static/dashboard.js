@@ -328,6 +328,8 @@ const CALENDAR_PIXELS_PER_HOUR = 180;
 const CALENDAR_CARD_MIN_WIDTH = 172;
 const CALENDAR_CARD_MAX_WIDTH = 320;
 const CALENDAR_CARD_GAP = 10;
+const CALENDAR_LANE_HEIGHT = 104;
+const CALENDAR_CARD_TOP_OFFSET = 9;
 
 function calendarStartMs(item) {
   const value = item?.start || item?.time;
@@ -415,7 +417,7 @@ function packTimelineItems(items, bounds) {
 }
 
 function timelineItemStyle(timelineItem) {
-  const top = timelineItem.lane * 86 + 7;
+  const top = timelineItem.lane * CALENDAR_LANE_HEIGHT + CALENDAR_CARD_TOP_OFFSET;
   return `--left:${timelineItem.leftPx.toFixed(1)}px;--width:${timelineItem.widthPx.toFixed(1)}px;--top:${top}px;`;
 }
 
@@ -479,16 +481,26 @@ function renderTimelineRow(targetId, items, bounds, emptyText) {
   if (!target) return 1;
   if (!items.length || !bounds) {
     target.style.setProperty("--lane-count", "1");
-    target.style.height = "86px";
+    target.style.height = `${CALENDAR_LANE_HEIGHT}px`;
     target.innerHTML = `<p>${escapeHtml(emptyText)}</p>`;
     return 1;
   }
   const packed = packTimelineItems(items, bounds);
   const laneCount = Math.max(...packed.map((item) => item.lane)) + 1;
   target.style.setProperty("--lane-count", String(laneCount));
-  target.style.height = `${laneCount * 86}px`;
+  target.style.height = `${laneCount * CALENDAR_LANE_HEIGHT}px`;
   target.innerHTML = packed.map((item) => timelineItemHtml(item)).join("");
   return laneCount;
+}
+
+function timelineFocusLeft(items, bounds) {
+  if (!bounds || !items.length) return 0;
+  const now = Date.now();
+  const sorted = [...items].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
+  const active = sorted.find((item) => item.startMs <= now && item.endMs >= now);
+  const next = sorted.find((item) => item.startMs >= now);
+  const target = active || next || sorted[0];
+  return Math.max(0, timelineLeftPx(target.startMs, bounds) - 28);
 }
 
 function renderMarketCalendar(calendar) {
@@ -544,8 +556,16 @@ function renderMarketCalendar(calendar) {
   if (timeline) {
     timeline.style.setProperty(
       "--tick-height",
-      `${56 + riskLaneCount * 86 + rangeLaneCount * 86}px`,
+      `${56 + riskLaneCount * CALENDAR_LANE_HEIGHT + rangeLaneCount * CALENDAR_LANE_HEIGHT}px`,
     );
+  }
+  const scroll = $("calendar-timeline-scroll");
+  if (scroll && bounds) {
+    const focusKey = `${bounds.startMs}:${bounds.endMs}:${topItems.length}:${rangeItems.length}`;
+    if (container.dataset.timelineFocusKey !== focusKey) {
+      scroll.scrollLeft = timelineFocusLeft([...topItems, ...rangeItems], bounds);
+      container.dataset.timelineFocusKey = focusKey;
+    }
   }
 }
 

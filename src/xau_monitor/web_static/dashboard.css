@@ -460,8 +460,8 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .range-title span { color: var(--green); }
 .timeline-row {
   position: relative;
-  min-height: 84px;
-  height: 86px;
+  min-height: 104px;
+  height: 104px;
   border: 1px solid rgba(255,255,255,.045);
   border-radius: 11px;
   background: rgba(0,0,0,.14);
@@ -481,7 +481,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   top: var(--top);
   box-sizing: border-box;
   width: var(--width);
-  min-height: 70px;
+  height: 82px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
@@ -540,7 +540,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .timeline-item strong {
   display: block;
-  margin: 4px 0;
+  margin: 5px 0;
   overflow: hidden;
   color: var(--text);
   font-size: 12px;

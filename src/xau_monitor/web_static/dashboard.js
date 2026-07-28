@@ -287,6 +287,47 @@ function escapeHtml(value) {
   })[character]);
 }
 
+function formatCalendarDate(value) {
+  if (!value) return "--";
+  const date = new Date(`${value}T00:00:00+08:00`);
+  return date.toLocaleDateString("zh-CN", {
+    month: "2-digit",
+    day: "2-digit",
+    weekday: "short",
+  });
+}
+
+function eventToneClass(impact) {
+  if (impact === "最高+" || impact === "最高") return "critical";
+  if (impact === "高") return "high";
+  return "medium";
+}
+
+function renderMarketCalendar(calendar) {
+  const container = $("market-calendar");
+  if (!container || !calendar) return;
+  setText("calendar-date", `${formatCalendarDate(calendar.date)} · 北京时间`);
+  setText("calendar-summary", calendar.summary || "今日风险时间");
+  const windows = Array.isArray(calendar.windows) ? calendar.windows : [];
+  const events = Array.isArray(calendar.events) ? calendar.events : [];
+  $("calendar-windows").innerHTML = windows.map((windowItem) => `
+    <div class="calendar-chip ${eventToneClass(windowItem.impact)} ${windowItem.status}">
+      <span>${escapeHtml(windowItem.title)}</span>
+      <strong>${escapeHtml(windowItem.time_label)}</strong>
+      <small>${escapeHtml(windowItem.note)}</small>
+    </div>
+  `).join("");
+  $("calendar-events").innerHTML = events.length
+    ? events.map((event) => `
+      <div class="event-chip ${eventToneClass(event.impact)} ${event.status}">
+        <time>${escapeHtml(event.time_label)}</time>
+        <strong>${escapeHtml(event.title)}</strong>
+        <span>${escapeHtml(event.impact)} · ${escapeHtml(event.source)}</span>
+      </div>
+    `).join("")
+    : `<p>今日/今夜暂无最高级美国事件，重点看固定交易时段。</p>`;
+}
+
 function closeStrategyHelp() {
   const popover = $("strategy-help-popover");
   if (!popover) return;
@@ -2127,6 +2168,7 @@ function render(data) {
 
   renderFrames(data.frames);
   renderVolume(data.volume_proxy, data.live_volume);
+  renderMarketCalendar(data.market_calendar);
   renderScalpStrategy(data);
   drawSelectedChart(data);
 

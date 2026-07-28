@@ -361,6 +361,95 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   font-weight: 750;
 }
 
+.market-calendar {
+  margin: -4px 0 14px;
+  border: 1px solid rgba(233,185,73,.18);
+  border-radius: 13px;
+  padding: 12px 14px;
+  background: rgba(7, 9, 10, .42);
+}
+.calendar-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.calendar-head span,
+.calendar-head time {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 750;
+  letter-spacing: 0;
+}
+.calendar-head strong {
+  display: block;
+  margin-top: 4px;
+  color: #d7dbd8;
+  font-size: 13px;
+}
+.calendar-head time {
+  flex: 0 0 auto;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-windows,
+.calendar-events {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+  scrollbar-width: thin;
+}
+.calendar-events { margin-top: 8px; }
+.calendar-chip,
+.event-chip {
+  flex: 0 0 auto;
+  min-width: 148px;
+  max-width: 230px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 10px;
+  background: rgba(255,255,255,.015);
+}
+.calendar-chip.active,
+.event-chip.near {
+  border-color: rgba(233,185,73,.65);
+  background: rgba(233,185,73,.11);
+}
+.calendar-chip.past,
+.event-chip.past { opacity: .48; }
+.calendar-chip span,
+.event-chip span,
+.calendar-chip small {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+  line-height: 1.35;
+}
+.calendar-chip strong,
+.event-chip strong {
+  display: block;
+  margin: 4px 0;
+  color: var(--text);
+  font-size: 12px;
+}
+.event-chip time {
+  display: block;
+  color: var(--gold);
+  font-size: 10px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+.calendar-chip.critical strong,
+.event-chip.critical strong { color: var(--red); }
+.calendar-chip.high strong,
+.event-chip.high strong { color: var(--gold); }
+.calendar-events p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+}
+
 .strategy-bar {
   margin: 0 0 14px;
   padding: 13px 14px;
@@ -1384,6 +1473,8 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   .chart-wrap { height: 270px; }
   .legend { display: none; }
   .chart-tools { gap: 8px; }
+  .calendar-head { align-items: flex-start; flex-direction: column; }
+  .calendar-chip, .event-chip { min-width: 155px; }
   .strategy-head { align-items: flex-start; }
   .indicator-toggles label { padding: 6px; }
   .volume-grid { grid-template-columns: 1fr; }

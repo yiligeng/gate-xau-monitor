@@ -25,6 +25,7 @@ from .auth import (
     InvalidInput,
 )
 from .indicators import analyze_frame
+from .market_calendar import market_calendar_payload
 from .monitor import Snapshot, fetch_snapshot, overall_bias, short_term_plan
 from .price_alerts import PriceAlertStore, dedupe_levels
 from .strategy import evaluate_scalp_strategy
@@ -315,6 +316,7 @@ class MarketState:
                 "overall": {"bias": bias, "score": score},
                 "plan": plan,
                 "strategy": strategy,
+                "market_calendar": market_calendar_payload(),
             }
 
     def stop(self) -> None:

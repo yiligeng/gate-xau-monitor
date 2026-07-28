@@ -387,9 +387,13 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   border-color: rgba(255,89,109,.32);
   background: rgba(40, 10, 15, .24);
 }
-.windows-section {
+.range-section {
   border-color: rgba(38,214,164,.2);
   background: rgba(7, 14, 13, .42);
+}
+.volatility-section {
+  border-color: rgba(233,185,73,.22);
+  background: rgba(23, 18, 8, .28);
 }
 .calendar-head {
   display: flex;
@@ -413,7 +417,8 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   font-size: 13px;
 }
 .calendar-windows,
-.calendar-events {
+.calendar-events,
+.calendar-volatility {
   display: flex;
   gap: 8px;
   overflow-x: auto;
@@ -443,6 +448,18 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .events-section .event-chip.active {
   border-color: rgba(255,89,109,.7);
   background: rgba(255,89,109,.11);
+}
+.range-section .calendar-chip {
+  border-color: rgba(38,214,164,.26);
+  background: rgba(38,214,164,.045);
+}
+.range-section .calendar-chip.active {
+  border-color: rgba(38,214,164,.7);
+  background: rgba(38,214,164,.12);
+}
+.volatility-chip.critical {
+  border-color: rgba(255,89,109,.26);
+  background: rgba(255,89,109,.04);
 }
 .calendar-chip.past,
 .event-chip.past { opacity: .48; }

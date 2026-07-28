@@ -16,6 +16,10 @@ class MarketCalendarTests(unittest.TestCase):
             for event_window in payload["event_windows"]
         }
         windows = {window["title"]: window for window in payload["windows"]}
+        volatility_windows = {
+            window["title"]: window
+            for window in payload["volatility_windows"]
+        }
 
         self.assertIn("FOMC 利率声明", events)
         self.assertIn("FOMC 发布会", events)
@@ -32,14 +36,19 @@ class MarketCalendarTests(unittest.TestCase):
         )
 
         windows = {window["title"]: window for window in payload["windows"]}
+        volatility_windows = {
+            window["title"]: window
+            for window in payload["volatility_windows"]
+        }
         event_titles = {event["title"] for event in payload["events"]}
 
+        self.assertEqual(set(windows), {"英国午饭震荡窗", "美国午饭震荡窗"})
         self.assertEqual(windows["英国午饭震荡窗"]["time_label"], "19:00-20:30")
-        self.assertEqual(windows["美国数据窗"]["time_label"], "20:25-20:45")
-        self.assertEqual(windows["纽约主波动"]["time_label"], "21:30-23:30")
         self.assertEqual(windows["美国午饭震荡窗"]["time_label"], "00:00-01:30")
         self.assertEqual(windows["美国午饭震荡窗"]["impact"], "震荡")
-        self.assertIn("ice.com", windows["LBMA 上午定盘"]["source_url"])
+        self.assertEqual(volatility_windows["美国数据窗"]["time_label"], "20:25-20:45")
+        self.assertEqual(volatility_windows["纽约主波动"]["time_label"], "21:30-23:30")
+        self.assertIn("ice.com", volatility_windows["LBMA 上午定盘"]["source_url"])
         self.assertIn("非农就业 NFP", event_titles)
 
 

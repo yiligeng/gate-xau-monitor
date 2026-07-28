@@ -310,7 +310,9 @@ function registerCalendarHelp(kind, item, index) {
     ? "重大事件"
     : kind === "event_window"
       ? "事件风险窗"
-      : "窗口时间";
+      : kind === "volatility"
+        ? "高波动时段"
+        : "震荡窗口";
   STRATEGY_HELP[key] = {
     title: item.title || label,
     body: `${item.time_label || "--"}。${item.note || "按北京时间观察价格反应。"}`,
@@ -326,6 +328,9 @@ function renderMarketCalendar(calendar) {
   if (!container || !calendar) return;
   setText("calendar-date", `${formatCalendarDate(calendar.date)} · 北京时间`);
   const windows = Array.isArray(calendar.windows) ? calendar.windows : [];
+  const volatilityWindows = Array.isArray(calendar.volatility_windows)
+    ? calendar.volatility_windows
+    : [];
   const eventWindows = Array.isArray(calendar.event_windows) ? calendar.event_windows : [];
   const events = Array.isArray(calendar.events) ? calendar.events : [];
   setText(
@@ -336,7 +341,11 @@ function renderMarketCalendar(calendar) {
   );
   setText(
     "calendar-window-summary",
-    "固定流动性节奏；绿色=震荡/假突破窗口，红色=高波动窗口。",
+    "只放吃饭等低流动性时段；绿色=震荡/假突破窗口。",
+  );
+  setText(
+    "calendar-volatility-summary",
+    "伦敦启动、定盘、美国数据、纽约主波动；更容易放大波动，不等于震荡窗口。",
   );
   const eventWindowCards = eventWindows.map((eventWindow, index) => {
     const helpKey = registerCalendarHelp("event_window", eventWindow, index);
@@ -366,11 +375,24 @@ function renderMarketCalendar(calendar) {
   }).join("");
   $("calendar-events").innerHTML = eventWindowCards || eventCards
     ? eventWindowCards + eventCards
-    : `<p>今日/今夜暂无重大事件；震荡策略仍以窗口时间和实时形态为准。</p>`;
+    : `<p>今日/今夜暂无重大事件；震荡策略仍以震荡窗口和实时形态为准。</p>`;
   $("calendar-windows").innerHTML = windows.map((windowItem, index) => {
     const helpKey = registerCalendarHelp("window", windowItem, index);
     return `
     <div class="calendar-chip ${eventToneClass(windowItem.impact)} ${windowItem.status}">
+      <div class="calendar-chip-top">
+        <span>${escapeHtml(windowItem.title)}</span>
+        <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(windowItem.title)}说明">i</button>
+      </div>
+      <strong>${escapeHtml(windowItem.time_label)}</strong>
+      <small>${escapeHtml(windowItem.note)}</small>
+    </div>
+  `;
+  }).join("");
+  $("calendar-volatility").innerHTML = volatilityWindows.map((windowItem, index) => {
+    const helpKey = registerCalendarHelp("volatility", windowItem, index);
+    return `
+    <div class="calendar-chip volatility-chip ${eventToneClass(windowItem.impact)} ${windowItem.status}">
       <div class="calendar-chip-top">
         <span>${escapeHtml(windowItem.title)}</span>
         <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(windowItem.title)}说明">i</button>
@@ -2384,6 +2406,12 @@ document.addEventListener("click", (event) => {
 });
 
 $("strategy-help-close")?.addEventListener("click", closeStrategyHelp);
+$("strategy-help-link")?.addEventListener("click", (event) => {
+  const href = event.currentTarget.getAttribute("href");
+  if (!href || href === "#") return;
+  event.preventDefault();
+  window.location.assign(href);
+});
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeStrategyHelp();
 });

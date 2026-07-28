@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=24">
+    <link rel="stylesheet" href="/dashboard.css?v=25">
   </head>
   <body>
     <main class="shell">
@@ -100,7 +100,7 @@
             </div>
           </div>
         </div>
-        <div id="market-calendar" class="market-calendar" aria-label="今日黄金事件与窗口时间">
+        <div id="market-calendar" class="market-calendar" aria-label="今日黄金事件与震荡窗口">
           <div class="calendar-date-row">
             <span>北京时间</span>
             <time id="calendar-date">--</time>
@@ -114,14 +114,23 @@
             </div>
             <div id="calendar-events" class="calendar-events"></div>
           </section>
-          <section class="calendar-section windows-section" aria-label="今日窗口时间">
+          <section class="calendar-section range-section" aria-label="今日震荡窗口">
             <div class="calendar-head">
               <div>
-                <span>窗口时间</span>
-                <strong id="calendar-window-summary">固定市场节奏，绿色表示震荡窗口</strong>
+                <span>震荡窗口</span>
+                <strong id="calendar-window-summary">只放低流动性、容易假突破的窗口</strong>
               </div>
             </div>
             <div id="calendar-windows" class="calendar-windows"></div>
+          </section>
+          <section class="calendar-section volatility-section" aria-label="今日高波动时段">
+            <div class="calendar-head">
+              <div>
+                <span>高波动时段</span>
+                <strong id="calendar-volatility-summary">流动性进场或数据窗口，不按震荡窗口处理</strong>
+              </div>
+            </div>
+            <div id="calendar-volatility" class="calendar-volatility"></div>
           </section>
         </div>
         <div class="strategy-bar">
@@ -548,8 +557,8 @@
       <strong id="strategy-help-title"></strong>
       <p id="strategy-help-body"></p>
       <code id="strategy-help-formula"></code>
-      <a id="strategy-help-link" class="help-link" href="#" target="_blank" rel="noopener noreferrer" hidden>查看来源</a>
+      <a id="strategy-help-link" class="help-link" href="#" rel="noopener noreferrer" hidden>查看来源</a>
     </div>
-    <script src="/dashboard.js?v=24"></script>
+    <script src="/dashboard.js?v=25"></script>
   </body>
 </html>

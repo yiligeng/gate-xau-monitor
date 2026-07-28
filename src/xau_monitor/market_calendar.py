@@ -82,6 +82,7 @@ def market_calendar_payload(now: datetime | None = None) -> dict[str, Any]:
         "date": now.date().isoformat(),
         "generated_at": now.isoformat(),
         "windows": windows,
+        "volatility_windows": daily_volatility_windows(now),
         "events": events,
         "event_windows": event_risk_windows(now, events),
         "summary": summary_for_events(events),
@@ -89,6 +90,31 @@ def market_calendar_payload(now: datetime | None = None) -> dict[str, Any]:
 
 
 def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
+    local_day = now.astimezone(SHANGHAI).date()
+    windows = [
+        _window_from_london(
+            now,
+            local_day,
+            "英国午饭震荡窗",
+            time(12, 0),
+            time(13, 30),
+            "震荡",
+            "午间流动性回落，适合观察刺破后收回",
+        ),
+        _window_from_new_york(
+            now,
+            local_day,
+            "美国午饭震荡窗",
+            time(12, 0),
+            time(13, 30),
+            "震荡",
+            "美国午间深度变薄，突破更容易变成假突破",
+        ),
+    ]
+    return sorted(windows, key=lambda item: item["start"])
+
+
+def daily_volatility_windows(now: datetime) -> list[dict[str, Any]]:
     local_day = now.astimezone(SHANGHAI).date()
     windows = [
         _window_from_london(
@@ -110,25 +136,6 @@ def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
             "伦敦黄金基准价附近",
             source_url=ICE_LBMA_URL,
         ),
-        _window_from_london(
-            now,
-            local_day,
-            "英国午饭震荡窗",
-            time(12, 0),
-            time(13, 30),
-            "震荡",
-            "午间流动性回落，适合观察刺破后收回",
-        ),
-        _window_from_london(
-            now,
-            local_day,
-            "LBMA 下午定盘",
-            time(14, 55),
-            time(15, 10),
-            "高",
-            "伦敦下午定盘，常与纽约早盘重叠",
-            source_url=ICE_LBMA_URL,
-        ),
         _window_from_new_york(
             now,
             local_day,
@@ -148,14 +155,15 @@ def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
             "最高",
             "美股开盘后，美元/美债/COMEX 同时活跃",
         ),
-        _window_from_new_york(
+        _window_from_london(
             now,
             local_day,
-            "美国午饭震荡窗",
-            time(12, 0),
-            time(13, 30),
-            "震荡",
-            "美国午间深度变薄，突破更容易变成假突破",
+            "LBMA 下午定盘",
+            time(14, 55),
+            time(15, 10),
+            "高",
+            "伦敦下午定盘，常与纽约早盘重叠",
+            source_url=ICE_LBMA_URL,
         ),
     ]
     return sorted(windows, key=lambda item: item["start"])

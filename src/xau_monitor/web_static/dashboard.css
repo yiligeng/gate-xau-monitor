@@ -460,8 +460,8 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .range-title span { color: var(--green); }
 .timeline-row {
   position: relative;
-  min-height: 104px;
-  height: 104px;
+  min-height: 74px;
+  height: 74px;
   border: 1px solid rgba(255,255,255,.045);
   border-radius: 11px;
   background: rgba(0,0,0,.14);
@@ -481,11 +481,11 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   top: var(--top);
   box-sizing: border-box;
   width: var(--width);
-  height: 82px;
+  height: 58px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 9px 10px;
+  padding: 7px 9px;
   background: rgba(255,255,255,.015);
 }
 .timeline-item.active,
@@ -533,24 +533,24 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   display: block;
   overflow: hidden;
   color: var(--muted);
-  font-size: 9px;
-  line-height: 1.35;
+  font-size: 8px;
+  line-height: 1.25;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .timeline-item strong {
   display: block;
-  margin: 5px 0;
+  margin: 3px 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 12px;
+  font-size: 11px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 .timeline-item time {
   display: block;
   color: var(--gold);
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
 }

@@ -328,8 +328,8 @@ const CALENDAR_PIXELS_PER_HOUR = 132;
 const CALENDAR_CARD_MIN_WIDTH = 132;
 const CALENDAR_CARD_MAX_WIDTH = 230;
 const CALENDAR_CARD_GAP = 8;
-const CALENDAR_LANE_HEIGHT = 104;
-const CALENDAR_CARD_TOP_OFFSET = 9;
+const CALENDAR_LANE_HEIGHT = 74;
+const CALENDAR_CARD_TOP_OFFSET = 8;
 
 function calendarStartMs(item) {
   const value = item?.start || item?.time;
@@ -395,18 +395,24 @@ function timelineCardWidthPx(item) {
 }
 
 function packTimelineItems(items, bounds) {
-  let nextLeftPx = 0;
+  const lanes = [];
   return [...items]
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
     .map((item) => {
-      const timeLeftPx = timelineLeftPx(item.startMs, bounds);
+      const leftPx = timelineLeftPx(item.startMs, bounds);
       const widthPx = Math.max(
         timelineCardWidthPx(item),
         (CALENDAR_MIN_CARD_MINUTES / 60) * CALENDAR_PIXELS_PER_HOUR,
       );
-      const leftPx = Math.max(timeLeftPx, nextLeftPx);
-      nextLeftPx = leftPx + widthPx + CALENDAR_CARD_GAP;
-      return { ...item, lane: 0, leftPx, timeLeftPx, widthPx };
+      const rightPx = leftPx + widthPx + CALENDAR_CARD_GAP;
+      let lane = lanes.findIndex((laneRightPx) => laneRightPx <= leftPx);
+      if (lane === -1) {
+        lane = lanes.length;
+        lanes.push(rightPx);
+      } else {
+        lanes[lane] = rightPx;
+      }
+      return { ...item, lane, leftPx, widthPx };
     });
 }
 
@@ -483,10 +489,11 @@ function renderTimelineRow(targetId, items, bounds, emptyText) {
   const maxRightPx = Math.max(
     ...packed.map((item) => item.leftPx + item.widthPx + CALENDAR_CARD_GAP),
   );
-  target.style.setProperty("--lane-count", "1");
-  target.style.height = `${CALENDAR_LANE_HEIGHT}px`;
+  const laneCount = Math.max(...packed.map((item) => item.lane)) + 1;
+  target.style.setProperty("--lane-count", String(laneCount));
+  target.style.height = `${laneCount * CALENDAR_LANE_HEIGHT}px`;
   target.innerHTML = packed.map((item) => timelineItemHtml(item)).join("");
-  return { laneCount: 1, maxRightPx };
+  return { laneCount, maxRightPx };
 }
 
 function timelineFocusLeft(items, bounds) {
@@ -524,7 +531,7 @@ function renderMarketCalendar(calendar) {
   }
   setText(
     "calendar-event-summary",
-    "上轨按北京时间排序；卡片碰撞时会横向避让，不按震荡窗口处理。",
+    "上轨按北京时间排序；重叠时上下分层，像甘特图一样看事件覆盖。",
   );
   setText(
     "calendar-risk-summary",

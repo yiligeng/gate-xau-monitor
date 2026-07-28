@@ -372,6 +372,33 @@ function itemContainsMs(timelineItem, ms) {
     && timelineItem.endMs >= ms;
 }
 
+function shanghaiMinuteOfDay(ms) {
+  if (!Number.isFinite(ms)) return null;
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).formatToParts(new Date(ms));
+  const hour = Number(parts.find((part) => part.type === "hour")?.value);
+  const minute = Number(parts.find((part) => part.type === "minute")?.value);
+  return Number.isFinite(hour) && Number.isFinite(minute) ? hour * 60 + minute : null;
+}
+
+function itemContainsShanghaiMinute(timelineItem, ms) {
+  const focusMinute = shanghaiMinuteOfDay(ms);
+  const startMinute = shanghaiMinuteOfDay(timelineItem.startMs);
+  const endMinute = shanghaiMinuteOfDay(timelineItem.endMs);
+  if (focusMinute === null || startMinute === null || endMinute === null) return false;
+  return startMinute <= endMinute
+    ? focusMinute >= startMinute && focusMinute <= endMinute
+    : focusMinute >= startMinute || focusMinute <= endMinute;
+}
+
+function timelineItemHasFocus(timelineItem, ms) {
+  return itemContainsMs(timelineItem, ms) || itemContainsShanghaiMinute(timelineItem, ms);
+}
+
 function timelineBounds(items) {
   const validItems = items.filter(Boolean);
   if (!validItems.length) return null;
@@ -454,7 +481,7 @@ function timelineItemHtml(timelineItem, focusMs) {
   const helpKey = registerCalendarHelp(kind, item, index);
   const tone = eventToneClass(item.impact);
   const style = timelineItemStyle(timelineItem);
-  const focusClass = itemContainsMs(timelineItem, focusMs) ? "chart-focus" : "";
+  const focusClass = timelineItemHasFocus(timelineItem, focusMs) ? "chart-focus" : "";
   if (kind === "event") {
     return `
       <div class="timeline-item event ${tone} ${item.status} ${focusClass}" style="${style}">
@@ -502,14 +529,18 @@ function renderTimelineRow(targetId, items, bounds, emptyText, focusMs) {
   return { laneCount, maxRightPx };
 }
 
-function timelineFocusLeft(items, bounds, focusMs = null) {
+function timelineFocusLeft(items, bounds, focusMs = null, viewportWidth = 0) {
   if (!bounds || !items.length) return 0;
   const sorted = [...items].sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs);
   const targetMs = Number.isFinite(focusMs) ? focusMs : Date.now();
-  const active = sorted.find((item) => itemContainsMs(item, targetMs));
+  const active = sorted.find((item) => timelineItemHasFocus(item, targetMs));
   const next = sorted.find((item) => item.startMs >= targetMs);
   const target = active || next || sorted[0];
-  return Math.max(0, timelineLeftPx(target.startMs, bounds) - 28);
+  const left = timelineLeftPx(target.startMs, bounds);
+  const centerOffset = Number.isFinite(viewportWidth) && viewportWidth > 0
+    ? Math.min(viewportWidth * 0.36, 260)
+    : 80;
+  return Math.max(0, left - centerOffset);
 }
 
 function renderMarketCalendar(calendar, focusMs = null) {
@@ -578,9 +609,15 @@ function renderMarketCalendar(calendar, focusMs = null) {
   }
   const scroll = $("calendar-timeline-scroll");
   if (scroll && bounds) {
-    const focusKey = `${bounds.startMs}:${bounds.endMs}:${topItems.length}:${rangeItems.length}`;
+    const focusBucket = Number.isFinite(focusMs) ? Math.floor(focusMs / 60_000) : "now";
+    const focusKey = `${bounds.startMs}:${bounds.endMs}:${topItems.length}:${rangeItems.length}:${focusBucket}`;
     if (container.dataset.timelineFocusKey !== focusKey) {
-      scroll.scrollLeft = timelineFocusLeft([...topItems, ...rangeItems], bounds, focusMs);
+      scroll.scrollLeft = timelineFocusLeft(
+        [...topItems, ...rangeItems],
+        bounds,
+        focusMs,
+        scroll.clientWidth,
+      );
       container.dataset.timelineFocusKey = focusKey;
     }
   }

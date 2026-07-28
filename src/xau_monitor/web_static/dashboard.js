@@ -328,8 +328,8 @@ const CALENDAR_PIXELS_PER_HOUR = 132;
 const CALENDAR_CARD_MIN_WIDTH = 132;
 const CALENDAR_CARD_MAX_WIDTH = 230;
 const CALENDAR_CARD_GAP = 8;
-const CALENDAR_LANE_HEIGHT = 68;
-const CALENDAR_CARD_TOP_OFFSET = 7;
+const CALENDAR_LANE_HEIGHT = 52;
+const CALENDAR_CARD_TOP_OFFSET = 4;
 
 function calendarStartMs(item) {
   const value = item?.start || item?.time;

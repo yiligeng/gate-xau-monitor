@@ -380,7 +380,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   min-width: 0;
   border: 1px solid rgba(233,185,73,.18);
   border-radius: 13px;
-  padding: 12px 14px;
+  padding: 9px 12px;
   background: rgba(7, 9, 10, .42);
 }
 .timeline-section {
@@ -421,7 +421,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .calendar-ticks {
   position: relative;
-  height: 24px;
+  height: 20px;
   border-bottom: 1px solid rgba(255,255,255,.055);
 }
 .timeline-tick {
@@ -436,7 +436,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .timeline-tick i {
   position: absolute;
-  top: 21px;
+  top: 18px;
   left: 50%;
   width: 1px;
   height: var(--tick-height, 205px);
@@ -447,7 +447,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   align-items: baseline;
   justify-content: space-between;
   gap: 12px;
-  margin: 10px 0 7px;
+  margin: 7px 0 5px;
 }
 .timeline-row-title span {
   color: #d7dbd8;
@@ -461,8 +461,8 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .range-title span { color: var(--green); }
 .timeline-row {
   position: relative;
-  min-height: 68px;
-  height: 68px;
+  min-height: 52px;
+  height: 52px;
   border: 1px solid rgba(255,255,255,.045);
   border-radius: 11px;
   background: rgba(0,0,0,.14);
@@ -482,11 +482,11 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   top: var(--top);
   box-sizing: border-box;
   width: var(--width);
-  height: 54px;
+  height: 44px;
   overflow: hidden;
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 7px 9px 6px;
+  border-radius: 8px;
+  padding: 5px 8px;
   background: rgba(255,255,255,.015);
 }
 .timeline-item.active,
@@ -525,9 +525,9 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   gap: 8px;
 }
 .calendar-info {
-  width: 14px;
-  height: 14px;
-  font-size: 9px;
+  width: 13px;
+  height: 13px;
+  font-size: 8px;
 }
 .timeline-item span,
 .timeline-item small {
@@ -541,11 +541,11 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .timeline-item strong {
   display: block;
-  margin: 6px 0 0;
+  margin: 4px 0 0;
   overflow: hidden;
   color: var(--text);
-  font-size: 11px;
-  line-height: 1.2;
+  font-size: 10px;
+  line-height: 1.15;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

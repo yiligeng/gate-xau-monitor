@@ -498,6 +498,28 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
                         f"待复核 {result['ambiguous']}。",
                         flush=True,
                     )
+                for notification in result.get("notifications", []):
+                    try:
+                        await ws_client.send_message(
+                            notification.chat_id,
+                            {
+                                "msgtype": "markdown",
+                                "markdown": {
+                                    "content": format_alert_notification(notification)
+                                },
+                            },
+                        )
+                        await asyncio.to_thread(
+                            alert_store.confirm_alert_notification,
+                            notification,
+                        )
+                    except Exception as exc:
+                        print(
+                            "企业微信插针触达提醒发送失败，保留待重试："
+                            f"alert_id={notification.id} "
+                            f"error={exc}",
+                            flush=True,
+                        )
             except Exception as exc:
                 consecutive_errors += 1
                 if consecutive_errors == 1 or consecutive_errors % 60 == 0:

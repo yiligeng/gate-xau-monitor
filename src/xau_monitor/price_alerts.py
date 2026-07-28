@@ -740,10 +740,16 @@ class PriceAlertStore:
         market: str,
         candles: list[Any],
         now: datetime | None = None,
-    ) -> dict[str, int]:
+    ) -> dict[str, Any]:
         now = now or utc_now()
         ordered_candles = sorted(candles, key=lambda item: int(item.timestamp))
-        result = {"opened": 0, "won": 0, "lost": 0, "ambiguous": 0}
+        result: dict[str, Any] = {
+            "opened": 0,
+            "won": 0,
+            "lost": 0,
+            "ambiguous": 0,
+            "notifications": [],
+        }
         if not ordered_candles:
             return result
 
@@ -857,19 +863,33 @@ class PriceAlertStore:
                     ),
                 )
                 if triggered_at is not None and trial["status"] == "pending":
-                    connection.execute(
+                    alert_row = connection.execute(
                         """
-                        UPDATE app.price_alerts
-                        SET status = CASE
-                                WHEN status = 'active' THEN 'breached'
-                                ELSE status
-                            END,
-                            breached_at = COALESCE(breached_at, %s),
-                            updated_at = %s
+                        SELECT id, chat_id, market, level, alert_limit,
+                               expires_at
+                        FROM app.price_alerts
                         WHERE id = %s
+                          AND status = 'active'
+                        FOR UPDATE
                         """,
-                        (triggered_at, now, row[1]),
-                    )
+                        (row[1],),
+                    ).fetchone()
+                    if alert_row is not None:
+                        result["notifications"].append(
+                            AlertNotification(
+                                id=alert_row[0],
+                                chat_id=alert_row[1],
+                                market=alert_row[2],
+                                level=float(alert_row[3]),
+                                price=float(trigger_price or trial["entry_price"]),
+                                distance=0.0,
+                                alerts_sent=int(alert_row[4]),
+                                alert_limit=int(alert_row[4]),
+                                expires_at=alert_row[5],
+                                event="breached",
+                                stage=int(alert_row[4]),
+                            )
+                        )
                 result[
                     {
                         "open": "opened",
@@ -910,15 +930,65 @@ class PriceAlertStore:
                 """,
                 (now, now, now, now),
             )
+            reconciled_rows = connection.execute(
+                """
+                SELECT alert.id, alert.chat_id, alert.market, alert.level,
+                       alert.alert_limit, alert.expires_at,
+                       COALESCE(
+                           trial.trigger_observed_price,
+                           trial.entry_price
+                       ) AS trigger_price
+                FROM app.price_alerts AS alert
+                JOIN app.point_strategy_trials AS trial
+                  ON trial.price_alert_id = alert.id
+                WHERE alert.market = %s
+                  AND alert.status = 'active'
+                  AND alert.expires_at > %s
+                  AND trial.status IN ('open', 'win', 'loss', 'ambiguous')
+                  AND trial.triggered_at IS NOT NULL
+                ORDER BY alert.id
+                FOR UPDATE OF alert SKIP LOCKED
+                """,
+                (market, now),
+            ).fetchall()
+            for row in reconciled_rows:
+                final_stage = int(row[4])
+                notifications.append(
+                    AlertNotification(
+                        id=row[0],
+                        chat_id=row[1],
+                        market=row[2],
+                        level=float(row[3]),
+                        price=float(row[6]),
+                        distance=0.0,
+                        alerts_sent=final_stage,
+                        alert_limit=final_stage,
+                        expires_at=row[5],
+                        event="breached",
+                        stage=final_stage,
+                    )
+                )
             rows = connection.execute(
                 """
                 SELECT id, chat_id, market, level, created_price, side,
                        approach_distance, alert_limit,
                        alerts_sent, last_alert_at, expires_at
-                FROM app.price_alerts
-                WHERE market = %s
-                  AND status = 'active'
-                  AND expires_at > %s
+                FROM app.price_alerts AS alert
+                WHERE alert.market = %s
+                  AND alert.status = 'active'
+                  AND alert.expires_at > %s
+                  AND NOT EXISTS (
+                      SELECT 1
+                      FROM app.point_strategy_trials AS trial
+                      WHERE trial.price_alert_id = alert.id
+                        AND trial.status IN (
+                            'open',
+                            'win',
+                            'loss',
+                            'ambiguous'
+                        )
+                        AND trial.triggered_at IS NOT NULL
+                  )
                 ORDER BY id
                 FOR UPDATE SKIP LOCKED
                 """,

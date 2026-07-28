@@ -415,8 +415,9 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   scrollbar-width: thin;
 }
 .calendar-timeline {
-  min-width: 1560px;
   position: relative;
+  width: var(--timeline-width, 1560px);
+  min-width: 100%;
 }
 .calendar-ticks {
   position: relative;
@@ -460,7 +461,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .timeline-row {
   position: relative;
   min-height: 84px;
-  height: calc(var(--lane-count, 1) * 86px);
+  height: 86px;
   border: 1px solid rgba(255,255,255,.045);
   border-radius: 11px;
   background: rgba(0,0,0,.14);
@@ -478,15 +479,15 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   position: absolute;
   left: var(--left);
   top: var(--top);
-  width: max(var(--width), 150px);
+  box-sizing: border-box;
+  width: var(--width);
   min-height: 70px;
-  max-width: 250px;
+  overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 9px 10px;
   background: rgba(255,255,255,.015);
 }
-.timeline-item.event { width: max(var(--width), 158px); }
 .timeline-item.active,
 .timeline-item.near {
   border-color: rgba(233,185,73,.65);
@@ -530,15 +531,21 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .timeline-item span,
 .timeline-item small {
   display: block;
+  overflow: hidden;
   color: var(--muted);
   font-size: 9px;
   line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .timeline-item strong {
   display: block;
   margin: 4px 0;
+  overflow: hidden;
   color: var(--text);
   font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .timeline-item time {
   display: block;
@@ -1592,10 +1599,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   .chart-tools { gap: 8px; }
   .calendar-head { align-items: flex-start; flex-direction: column; }
   .calendar-date-row { justify-content: flex-start; }
-  .calendar-timeline { min-width: 1120px; }
   .timeline-row-title { align-items: flex-start; flex-direction: column; gap: 3px; }
-  .timeline-item { width: max(var(--width), 136px); }
-  .timeline-item.event { width: max(var(--width), 142px); }
   .strategy-head { align-items: flex-start; }
   .indicator-toggles label { padding: 6px; }
   .volume-grid { grid-template-columns: 1fr; }

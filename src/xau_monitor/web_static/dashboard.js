@@ -324,6 +324,10 @@ function registerCalendarHelp(kind, item, index) {
 }
 
 const CALENDAR_MIN_CARD_MINUTES = 48;
+const CALENDAR_PIXELS_PER_HOUR = 180;
+const CALENDAR_CARD_MIN_WIDTH = 172;
+const CALENDAR_CARD_MAX_WIDTH = 320;
+const CALENDAR_CARD_GAP = 10;
 
 function calendarStartMs(item) {
   const value = item?.start || item?.time;
@@ -367,46 +371,59 @@ function timelineBounds(items) {
   return { startMs, endMs: Math.max(endMs, startMs + 60 * 60 * 1000) };
 }
 
-function timelinePercent(ms, bounds) {
-  const span = Math.max(bounds.endMs - bounds.startMs, 1);
-  return ((ms - bounds.startMs) / span) * 100;
+function timelineWidthPx(bounds) {
+  const hours = Math.max(
+    (bounds.endMs - bounds.startMs) / (60 * 60 * 1000),
+    1,
+  );
+  return Math.ceil(hours * CALENDAR_PIXELS_PER_HOUR + CALENDAR_CARD_MAX_WIDTH);
 }
 
-function packTimelineItems(items) {
+function timelineLeftPx(ms, bounds) {
+  return ((ms - bounds.startMs) / (60 * 60 * 1000)) * CALENDAR_PIXELS_PER_HOUR;
+}
+
+function timelineCardWidthPx(item) {
+  const minutes = Math.max((item.endMs - item.startMs) / (60 * 1000), 1);
+  const durationWidth = (minutes / 60) * CALENDAR_PIXELS_PER_HOUR;
+  return Math.max(
+    CALENDAR_CARD_MIN_WIDTH,
+    Math.min(CALENDAR_CARD_MAX_WIDTH, durationWidth),
+  );
+}
+
+function packTimelineItems(items, bounds) {
   const lanes = [];
   return [...items]
     .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
     .map((item) => {
-      const visibleEnd = Math.max(
-        item.endMs,
-        item.startMs + CALENDAR_MIN_CARD_MINUTES * 60 * 1000,
+      const leftPx = timelineLeftPx(item.startMs, bounds);
+      const widthPx = Math.max(
+        timelineCardWidthPx(item),
+        (CALENDAR_MIN_CARD_MINUTES / 60) * CALENDAR_PIXELS_PER_HOUR,
       );
-      let lane = lanes.findIndex((endMs) => endMs <= item.startMs);
+      const rightPx = leftPx + widthPx + CALENDAR_CARD_GAP;
+      let lane = lanes.findIndex((laneRightPx) => laneRightPx <= leftPx);
       if (lane === -1) {
         lane = lanes.length;
-        lanes.push(visibleEnd);
+        lanes.push(rightPx);
       } else {
-        lanes[lane] = visibleEnd;
+        lanes[lane] = rightPx;
       }
-      return { ...item, lane };
+      return { ...item, lane, leftPx, widthPx };
     });
 }
 
-function timelineItemStyle(timelineItem, bounds) {
-  const left = timelinePercent(timelineItem.startMs, bounds);
-  const width = Math.max(
-    timelinePercent(timelineItem.endMs, bounds) - left,
-    0.4,
-  );
+function timelineItemStyle(timelineItem) {
   const top = timelineItem.lane * 86 + 7;
-  return `--left:${left.toFixed(3)}%;--width:${width.toFixed(3)}%;--top:${top}px;`;
+  return `--left:${timelineItem.leftPx.toFixed(1)}px;--width:${timelineItem.widthPx.toFixed(1)}px;--top:${top}px;`;
 }
 
 function renderTimelineTicks(bounds) {
   if (!bounds) return "";
   const ticks = [];
   for (let ms = bounds.startMs; ms <= bounds.endMs; ms += 60 * 60 * 1000) {
-    const left = timelinePercent(ms, bounds);
+    const left = timelineLeftPx(ms, bounds);
     const label = new Date(ms).toLocaleTimeString("zh-CN", {
       hour: "2-digit",
       minute: "2-digit",
@@ -414,7 +431,7 @@ function renderTimelineTicks(bounds) {
       timeZone: "Asia/Shanghai",
     });
     ticks.push(`
-      <span class="timeline-tick" style="--left:${left.toFixed(3)}%;">
+      <span class="timeline-tick" style="--left:${left.toFixed(1)}px;">
         <i></i>
         <small>${escapeHtml(label)}</small>
       </span>
@@ -423,11 +440,11 @@ function renderTimelineTicks(bounds) {
   return ticks.join("");
 }
 
-function timelineItemHtml(timelineItem, bounds) {
+function timelineItemHtml(timelineItem) {
   const { kind, item, index } = timelineItem;
   const helpKey = registerCalendarHelp(kind, item, index);
   const tone = eventToneClass(item.impact);
-  const style = timelineItemStyle(timelineItem, bounds);
+  const style = timelineItemStyle(timelineItem);
   if (kind === "event") {
     return `
       <div class="timeline-item event ${tone} ${item.status}" style="${style}">
@@ -462,13 +479,15 @@ function renderTimelineRow(targetId, items, bounds, emptyText) {
   if (!target) return 1;
   if (!items.length || !bounds) {
     target.style.setProperty("--lane-count", "1");
+    target.style.height = "86px";
     target.innerHTML = `<p>${escapeHtml(emptyText)}</p>`;
     return 1;
   }
-  const packed = packTimelineItems(items);
+  const packed = packTimelineItems(items, bounds);
   const laneCount = Math.max(...packed.map((item) => item.lane)) + 1;
   target.style.setProperty("--lane-count", String(laneCount));
-  target.innerHTML = packed.map((item) => timelineItemHtml(item, bounds)).join("");
+  target.style.height = `${laneCount * 86}px`;
+  target.innerHTML = packed.map((item) => timelineItemHtml(item)).join("");
   return laneCount;
 }
 
@@ -491,6 +510,10 @@ function renderMarketCalendar(calendar) {
     .map((item, index) => toTimelineItem("window", item, index))
     .filter(Boolean);
   const bounds = timelineBounds([...topItems, ...rangeItems]);
+  const timeline = $("calendar-timeline");
+  if (timeline && bounds) {
+    timeline.style.setProperty("--timeline-width", `${timelineWidthPx(bounds)}px`);
+  }
   setText(
     "calendar-event-summary",
     "上轨按北京时间排序；红色容易单边，金色是高波动，不按震荡窗口处理。",
@@ -518,7 +541,6 @@ function renderMarketCalendar(calendar) {
     bounds,
     "今日暂无震荡窗口，仍以实时形态为准。",
   );
-  const timeline = $("calendar-timeline");
   if (timeline) {
     timeline.style.setProperty(
       "--tick-height",

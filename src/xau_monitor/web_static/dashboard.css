@@ -495,11 +495,12 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   background: rgba(233,185,73,.11);
 }
 .timeline-item.chart-focus {
-  border-color: rgba(242,207,102,.95);
-  background: rgba(242,207,102,.12);
+  border-color: #f2cf66;
+  background: rgba(242,207,102,.18);
   box-shadow:
-    0 0 0 1px rgba(242,207,102,.38),
-    0 0 18px rgba(242,207,102,.22);
+    0 0 0 2px rgba(242,207,102,.68),
+    0 0 24px rgba(242,207,102,.34);
+  z-index: 5;
 }
 .timeline-item.chart-focus::before {
   content: "K线";
@@ -536,12 +537,12 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .timeline-item.event.chart-focus,
 .timeline-item.event_window.chart-focus,
 .timeline-item.volatility.critical.chart-focus {
-  border-color: rgba(242,207,102,.95);
-  background: rgba(255,89,109,.055);
+  border-color: #f2cf66;
+  background: rgba(242,207,102,.16);
 }
 .timeline-item.window.chart-focus {
-  border-color: rgba(242,207,102,.95);
-  background: rgba(38,214,164,.10);
+  border-color: #f2cf66;
+  background: rgba(242,207,102,.16);
 }
 .timeline-item.past { opacity: .48; }
 .calendar-chip-top {

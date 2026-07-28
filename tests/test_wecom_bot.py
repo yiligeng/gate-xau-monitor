@@ -1,13 +1,16 @@
 import unittest
 
 from xau_monitor.price_alerts import (
+    build_point_strategy_plan,
     is_breached,
     parse_today_levels_command,
     should_alert,
+    strategy_status_for_price,
 )
 from xau_monitor.wecom_bot import (
     extract_chat_id,
     format_market_reply,
+    format_strategy_stats,
     help_message,
     select_market_id,
 )
@@ -83,6 +86,79 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertTrue(should_alert(alert, 4000.0, __import__("datetime").datetime.now()))
         self.assertFalse(is_breached(alert, 4000.0))
         self.assertTrue(is_breached(alert, 3997.0))
+
+    def test_builds_fixed_five_point_long_plan(self) -> None:
+        plan = build_point_strategy_plan(4050.0, 4046.98)
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan["direction"], "long")
+        self.assertEqual(plan["entry_price"], 4046.98)
+        self.assertEqual(plan["stop_loss"], 4041.98)
+        self.assertEqual(plan["take_profit"], 4051.98)
+
+    def test_builds_fixed_five_point_short_plan(self) -> None:
+        plan = build_point_strategy_plan(4050.0, 4056.25)
+
+        self.assertIsNotNone(plan)
+        assert plan is not None
+        self.assertEqual(plan["direction"], "short")
+        self.assertEqual(plan["entry_price"], 4056.25)
+        self.assertEqual(plan["stop_loss"], 4061.25)
+        self.assertEqual(plan["take_profit"], 4051.25)
+
+    def test_tracks_long_trial_from_entry_to_win_or_loss(self) -> None:
+        pending = {
+            "status": "pending",
+            "direction": "long",
+            "entry_price": 4046.98,
+            "stop_loss": 4041.98,
+            "take_profit": 4051.98,
+        }
+        self.assertEqual(strategy_status_for_price(pending, 4047.0), "pending")
+        self.assertEqual(strategy_status_for_price(pending, 4046.98), "open")
+        self.assertEqual(strategy_status_for_price(pending, 4041.0), "loss")
+
+        opened = pending | {"status": "open"}
+        self.assertEqual(strategy_status_for_price(opened, 4051.98), "win")
+        self.assertEqual(strategy_status_for_price(opened, 4041.98), "loss")
+
+    def test_tracks_short_trial_from_entry_to_win_or_loss(self) -> None:
+        pending = {
+            "status": "pending",
+            "direction": "short",
+            "entry_price": 4056.25,
+            "stop_loss": 4061.25,
+            "take_profit": 4051.25,
+        }
+        self.assertEqual(strategy_status_for_price(pending, 4056.0), "pending")
+        self.assertEqual(strategy_status_for_price(pending, 4056.25), "open")
+        self.assertEqual(strategy_status_for_price(pending, 4062.0), "loss")
+
+        opened = pending | {"status": "open"}
+        self.assertEqual(strategy_status_for_price(opened, 4051.25), "win")
+        self.assertEqual(strategy_status_for_price(opened, 4061.25), "loss")
+
+    def test_formats_empty_strategy_stats_without_fake_win_rate(self) -> None:
+        reply = format_strategy_stats(
+            "xau",
+            {
+                "wins": 0,
+                "losses": 0,
+                "settled": 0,
+                "open": 0,
+                "pending": 3,
+                "expired": 0,
+                "net_points": 0,
+                "win_rate": None,
+                "expectancy_points": None,
+                "tracking_since": None,
+            },
+        )
+
+        self.assertIn("暂无已结算样本", reply)
+        self.assertIn("待触发：3", reply)
+        self.assertIn("不含点差、滑点和手续费", reply)
 
 
 if __name__ == "__main__":

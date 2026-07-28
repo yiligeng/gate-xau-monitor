@@ -24,7 +24,8 @@
 当前最重要的事实：
 
 1. XAU/BTC 行情和 `SCALP-1.0-PY` 核心策略已经在 Python 后端。
-2. 数据库目前真正保存用户和会话；策略历史表已建但仍是空表。
+2. 数据库保存用户、会话、每日点位告警和 `LEVEL-5X5-V1` 点位试验；
+   `strategy_snapshots` 仍是空表。
 3. 浏览器里的模拟交易日志仍使用 `localStorage`，没有进数据库。
 4. 当前没有 CDN、AWS WAF、IP 黑名单、IP 限流或 Fail2ban。
 5. 不得把任何密码、Cookie、数据库连接串、AWS 凭据或 SSH 私钥写进文档。
@@ -159,16 +160,34 @@ systemd 从下面的 root-only 文件加载数据库连接：
 - 指令：`黄金 今日点位 A B C D`，其中 `A B C D` 是用户当天实际点位
 - 查看：`黄金 点位`
 - 取消：`黄金 取消今日点位`
+- 统计：`黄金 胜率` 或 `黄金 点位统计`
 - 网页：主仪表盘“免费实时量能”下方的“机器人点位告警”面板可查看、覆盖
   保存或取消同一企业微信会话的今日点位
 - 网页 API：`GET /api/bot/alerts`、`POST /api/bot/alerts`、
   `POST /api/bot/alerts/cancel`
-- 存储：`app.price_alerts`
+- 存储：`app.price_alerts`、`app.point_strategy_trials`
 - 有效期：北京时间当天 24 点
 - 告警：距离点位小于等于 3 美元，最多 2 次，默认两次至少间隔 60 秒
 - 作废：从创建时价格所在一侧触达或穿过点位后，状态改为 `breached`
 - 示例：创建时黄金现价 4000，点位 3997，价格到 3997 即作废；不是等到
   3996 或穿过 1 美元后才作废。
+
+`LEVEL-5X5-V1` 长期验证规则：
+
+- 创建时点位低于 Gate 最新价：做多；点位高于最新价：做空
+- 点位须在北京时间当天 24:00 前触达，触达后从 `pending` 变为 `open`
+- 做多：止损为点位减 5 美元，止盈为点位加 5 美元
+- 做空：止损为点位加 5 美元，止盈为点位减 5 美元
+- 入场后跨日继续跟踪，直到先触发 `win` 或 `loss`
+- 替换、取消、当天未触发的样本不进入胜率分母
+- 胜率：`wins / (wins + losses)`
+- 使用 Gate `last` 最新价，不含点差、滑点和手续费；统计是规则命中率，
+  不是实际净收益率
+- 机器人循环按新报价 sequence 检查，内部 0.1 秒轮询，减少短暂触达漏记
+- 网页机器人面板展示累计胜率、理论点数、单笔期望和最近逐笔记录
+
+2026-07-28 上线迁移时，24 条已有黄金告警中有 22 条仍活跃并被回填为
+`pending`；另外 2 条已经触达，因缺少触达后的历史逐价数据，没有伪造输赢。
 
 行情节奏：
 
@@ -326,8 +345,10 @@ Schema：`app`
 
 - `db/migrations/001_initial.sql`
 - `db/migrations/002_auth.sql`
+- `db/migrations/003_price_alerts.sql`
+- `db/migrations/004_point_strategy_trials.sql`
 
-当前 schema version：2。
+当前 schema version：4。
 
 表：
 
@@ -335,11 +356,15 @@ Schema：`app`
 - `app.strategy_snapshots`
 - `app.users`
 - `app.sessions`
+- `app.price_alerts`
+- `app.point_strategy_trials`
 
 当前真实持久化内容：
 
 - 用户账号和密码哈希
 - 有效登录会话
+- 每日点位告警
+- `LEVEL-5X5-V1` 点位策略的初始价、方向、入场、止损、止盈和结果
 - Schema 版本
 
 当前没有持久化：
@@ -374,6 +399,8 @@ Schema：`app`
 | `src/xau_monitor/strategy.py` | `SCALP-1.0-PY` |
 | `src/xau_monitor/auth.py` | scrypt 用户认证、数据库会话 |
 | `src/xau_monitor/users.py` | 管理员用户 CLI |
+| `src/xau_monitor/price_alerts.py` | 每日点位、±5 美元试验生命周期与统计 |
+| `src/xau_monitor/wecom_bot.py` | 企业微信长连接、指令和主动提醒 |
 | `src/xau_monitor/web.py` | 市场状态、HTTP 路由、鉴权、静态文件 |
 | `src/xau_monitor/web_static/dashboard.*` | 当前仪表盘 |
 | `src/xau_monitor/web_static/login.html` | 登录页 |
@@ -411,7 +438,7 @@ bash -n aws/postgresql/xau-monitor-db-backup
 git diff --check
 ```
 
-2026-07-28：18 项 unittest 全部通过。
+2026-07-28：29 项 unittest 全部通过。
 
 测试覆盖：
 
@@ -424,6 +451,9 @@ git diff --check
 - 单字符用户名
 - 未登录跳转和 API 401
 - Secure/HttpOnly/SameSite Cookie
+- ±5 美元做多/做空计划
+- 待触发、持仓、止盈和止损状态转换
+- 空样本不伪造胜率
 
 生产黑盒验证不要在命令行参数、日志或输出中显示密码和 Cookie。
 
@@ -672,9 +702,8 @@ Lightsail 防火墙是允许型规则。当 443 已允许 `0.0.0.0/0` 时，它�
 
 ### 高优先级
 
-1. 项目目录目前没有独立 Git 历史；父目录 Git 把整个项目视为未跟踪文件。
-   在多人或持续开发前，应建立明确仓库和首次安全提交，但提交前必须检查
-   没有凭据、私钥、数据库 dump 或本地数据。
+1. GitHub private repo 已建立，但当前 plan 不能为 private repo 强制开启
+   `main` branch protection；不要把生产部署改成 push 自动触发。
 2. `启动监控.command` 没有加载本地 `DATABASE_URL`。登录改造后，如果
    本机没有单独 PostgreSQL 和环境变量，它不能作为可靠本地入口。
 3. `连接云端监控.command` 仍用未登录 `/api/snapshot` 判断隧道健康，
@@ -686,6 +715,10 @@ Lightsail 防火墙是允许型规则。当 443 已允许 `0.0.0.0/0` 时，它�
 
 - 策略信号未入库
 - 模拟交易日志只在浏览器
+- `LEVEL-5X5-V1` 使用收到的 Gate 最新价观察结果，不保存完整逐 Tick 证据；
+  行情中断或两次观察之间的快速往返可能无法精确还原先后顺序
+- 点位验证依赖 `xau-monitor-wecom-bot` 持续运行；监控该服务健康
+- 价格跳空越过入场和止损时按负样本保守结算
 - 没有用户角色/权限等级
 - 没有管理员网页
 - 没有邮件找回、MFA、验证码
@@ -703,13 +736,15 @@ Lightsail 防火墙是允许型规则。当 443 已允许 `0.0.0.0/0` 时，它�
 按优先级：
 
 1. 修复或退役两个 `.command` 启动脚本。
-2. 建立独立 Git 仓库和首个安全提交。
+2. 为 GitHub 升级 branch protection，继续保留手动生产发布。
 3. 增加离机数据库备份。
-4. 明确哪些策略数据需要保存、频率和保留周期，再接
+4. 持续积累 `LEVEL-5X5-V1` 样本；样本量足够后按做多/做空、日期和波动环境
+   分层评估，不要只看总胜率。
+5. 明确哪些主策略数据需要保存、频率和保留周期，再接
    `app.strategy_snapshots`。
-5. 如果用户量和业务价值提高，再迁移 RDS。
-6. 如果出现真实攻击或跨洲延迟，再评估 CloudFront/WAF 或 Cloudflare。
-7. 需要多用户运营时，再增加管理员 UI、角色、审计和 MFA。
+6. 如果用户量和业务价值提高，再迁移 RDS。
+7. 如果出现真实攻击或跨洲延迟，再评估 CloudFront/WAF 或 Cloudflare。
+8. 需要多用户运营时，再增加管理员 UI、角色、审计和 MFA。
 
 ## 19. 新 AI 开始工作的检查清单
 

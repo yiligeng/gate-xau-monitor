@@ -61,9 +61,11 @@ def help_message() -> str:
             "- 黄金 今日点位 4093.67 4087.70：设置今天24点前有效的提醒",
             "- 黄金 点位：查看今天还活着的提醒",
             "- 黄金 取消今日点位：清空今天的提醒",
+            "- 黄金 胜率：查看正负5美元策略的长期统计",
             "- 帮助：查看这份菜单",
             "",
             "点位规则：距离小于等于3美元提醒，最多2次；触达点位后当天作废。",
+            "验证规则：下方点位做多、上方点位做空，触发后止盈止损各5美元。",
             "提示：机器人只读行情和策略摘要，不会下单。",
         ]
     )
@@ -191,6 +193,54 @@ def _format_levels(levels: list[float]) -> str:
     return " ".join(f"{level:,.2f}" for level in levels)
 
 
+def format_strategy_stats(
+    market_id: str,
+    stats: dict[str, Any],
+) -> str:
+    settled = int(stats.get("settled") or 0)
+    win_rate = stats.get("win_rate")
+    expectancy = stats.get("expectancy_points")
+    tracking_since = stats.get("tracking_since")
+    lines = [
+        f"**{market_display_name(market_id)} ±5点策略统计**",
+        (
+            f"已结算：{settled} 笔  "
+            f"胜/负：{int(stats.get('wins') or 0)}/"
+            f"{int(stats.get('losses') or 0)}"
+        ),
+        (
+            f"胜率：{win_rate:.2f}%"
+            if win_rate is not None
+            else "胜率：暂无已结算样本"
+        ),
+        (
+            f"持仓中：{int(stats.get('open') or 0)}  "
+            f"待触发：{int(stats.get('pending') or 0)}  "
+            f"未触发到期：{int(stats.get('expired') or 0)}"
+        ),
+        (
+            f"累计理论点数：{float(stats.get('net_points') or 0):+.2f}  "
+            + (
+                f"单笔期望：{float(expectancy):+.2f}"
+                if expectancy is not None
+                else "单笔期望：-"
+            )
+        ),
+    ]
+    if isinstance(tracking_since, datetime):
+        lines.append(
+            f"开始记录：{tracking_since.astimezone(SHANGHAI):%Y-%m-%d %H:%M}"
+        )
+    lines.extend(
+        [
+            "",
+            "口径：下方点位做多、上方点位做空；触发后止盈/止损各5美元。",
+            "仅按Gate最新价判断，不含点差、滑点和手续费，不代表实际净收益。",
+        ]
+    )
+    return "\n".join(lines)
+
+
 def _handle_alert_command(
     text: str,
     frame: dict[str, Any],
@@ -235,7 +285,19 @@ def _handle_alert_command(
                 f"点位：{_format_levels([row['level'] for row in rows])}",
                 f"有效期：北京时间 {expires_at:%m-%d %H:%M}",
                 "规则：距离<=3提醒，最多2次；触达点位后作废。",
+                "验证：下方点位做多、上方点位做空；止盈/止损各5美元。",
             ]
+        )
+
+    if "胜率" in text or "点位统计" in text:
+        if alert_store is None:
+            return "点位策略统计需要数据库配置，目前无法读取。"
+        chat_id = extract_chat_id(frame)
+        if not chat_id:
+            return "没有拿到当前会话ID，暂时不能查看胜率。"
+        return format_strategy_stats(
+            market_id,
+            alert_store.strategy_stats(chat_id, market_id),
         )
 
     if "点位" in text:
@@ -285,7 +347,7 @@ def format_alert_notification(notification: AlertNotification) -> str:
             f"目标位：{notification.level:,.2f}",
             f"距离：{notification.distance:.2f}",
             f"提醒次数：{notification.alerts_sent}/{notification.alert_limit}",
-            "触达点位后，这条点位今天会自动作废。",
+            "触达后告警作废；±5点策略会继续跟踪到止盈或止损。",
         ]
     )
 
@@ -346,11 +408,16 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
         if alert_store is None:
             print("未配置 DATABASE_URL，点位提醒功能未启用。", flush=True)
             return
+        last_sequences: dict[str, int] = {}
         while True:
             for market_id, state in states.items():
                 payload = state.payload()
                 if not payload.get("ok"):
                     continue
+                sequence = int(payload.get("feed", {}).get("sequence") or 0)
+                if last_sequences.get(market_id) == sequence:
+                    continue
+                last_sequences[market_id] = sequence
                 current_price = float(payload["ticker"]["last"])
                 notifications = await asyncio.to_thread(
                     alert_store.collect_due_alerts,
@@ -367,7 +434,7 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
                             },
                         },
                     )
-            await asyncio.sleep(5)
+            await asyncio.sleep(0.1)
 
     async def main() -> None:
         await ws_client.connect()

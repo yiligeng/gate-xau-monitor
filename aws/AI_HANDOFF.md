@@ -88,7 +88,7 @@ It listens on `127.0.0.1:8765` locally.
   SCRAM-SHA-256 password authentication.
 - The local database and application role are both named `xau_monitor`. The
   role is not a superuser and cannot create databases, roles, or replication.
-  The schema version is `2`, under the `app` schema.
+  The schema version is `4`, under the `app` schema.
 - The database connection string is stored only in
   `/etc/xau-monitor/database.env`, owned by `root:root` with mode `600`.
   Never print, copy, commit, or upload this file or its value.
@@ -100,6 +100,12 @@ It listens on `127.0.0.1:8765` locally.
   password hashes and `app.sessions` stores only SHA-256 session token
   digests. The raw password and raw session token are never stored in the
   project.
+- WeCom daily levels are stored in `app.price_alerts`.
+  `app.point_strategy_trials` stores the `LEVEL-5X5-V1` forward-test lifecycle:
+  levels below the creation price are long, levels above are short, and each
+  triggered trial is tracked to a fixed 5 USD stop or 5 USD target. Win rate
+  excludes pending, expired, replaced, and cancelled trials. The price basis
+  is Gate `last`, without spread, slippage, or fees.
 - The initial account is `owner`. Its random initial password is stored in the
   deploying Mac's login keychain under service
   `sheshetrip.fun-user-login` and account `owner`. Never print or copy it into

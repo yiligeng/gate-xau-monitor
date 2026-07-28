@@ -409,6 +409,79 @@ function setBotBusy(busy) {
     });
 }
 
+function renderBotStrategy(strategy = {}) {
+  const settled = Number(strategy.settled || 0);
+  const winRate = strategy.win_rate == null ? null : Number(strategy.win_rate);
+  const expectancy = strategy.expectancy_points == null
+    ? null
+    : Number(strategy.expectancy_points);
+  const netPoints = Number(strategy.net_points || 0);
+  setText("bot-strategy-settled", String(settled));
+  setText(
+    "bot-strategy-win-rate",
+    winRate != null && Number.isFinite(winRate) ? `${winRate.toFixed(2)}%` : "--",
+  );
+  setText(
+    "bot-strategy-record",
+    `${Number(strategy.wins || 0)} / ${Number(strategy.losses || 0)}`,
+  );
+  setText(
+    "bot-strategy-net",
+    `${netPoints >= 0 ? "+" : ""}${netPoints.toFixed(2)}`,
+  );
+  setText(
+    "bot-strategy-expectancy",
+    expectancy != null && Number.isFinite(expectancy)
+      ? `${expectancy >= 0 ? "+" : ""}${expectancy.toFixed(2)}`
+      : "--",
+  );
+  setText(
+    "bot-strategy-live",
+    `${Number(strategy.open || 0)} / ${Number(strategy.pending || 0)}`,
+  );
+
+  const recent = Array.isArray(strategy.recent) ? strategy.recent.slice(0, 8) : [];
+  const target = $("bot-strategy-recent");
+  if (!target) return;
+  if (!recent.length) {
+    target.innerHTML = "<p>还没有策略验证记录；新设置或当前仍活跃的点位会从现在开始记录。</p>";
+    return;
+  }
+  const statusLabels = {
+    pending: "待触发",
+    open: "持仓中",
+    win: "胜",
+    loss: "负",
+    expired: "未触发",
+    replaced: "已覆盖",
+    cancelled: "已取消",
+  };
+  target.innerHTML = recent.map((trial) => `
+    <div class="bot-trial">
+      <div class="${escapeHtml(trial.status || "")}">
+        <span>${trial.direction === "long" ? "做多" : "做空"}</span>
+        <strong>${statusLabels[trial.status] || trial.status || "-"}</strong>
+      </div>
+      <div>
+        <span>设置时价格</span>
+        <strong>${priceFormat.format(trial.initial_price)}</strong>
+      </div>
+      <div>
+        <span>入场点位</span>
+        <strong>${priceFormat.format(trial.entry_price)}</strong>
+      </div>
+      <div>
+        <span>止损 / 止盈</span>
+        <strong>${priceFormat.format(trial.stop_loss)} / ${priceFormat.format(trial.take_profit)}</strong>
+      </div>
+      <div>
+        <span>结算观察价</span>
+        <strong>${trial.exit_observed_price == null ? "--" : priceFormat.format(trial.exit_observed_price)}</strong>
+      </div>
+    </div>
+  `).join("");
+}
+
 function renderBotAlerts(data) {
   if (!data?.ok) return;
   botSelectedChatId = data.selected_chat_id || "";
@@ -421,6 +494,7 @@ function renderBotAlerts(data) {
       ? `${data.alerts?.length || 0} 条活跃`
       : "等待会话",
   );
+  renderBotStrategy(data.strategy || {});
 
   const chatSelect = $("bot-chat-select");
   if (chatSelect) {

@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=18">
+    <link rel="stylesheet" href="/dashboard.css?v=19">
   </head>
   <body>
     <main class="shell">
@@ -389,6 +389,49 @@
             </div>
           </div>
         </div>
+
+        <div class="bot-strategy">
+          <div class="bot-strategy-head">
+            <div>
+              <span>LEVEL-5X5-V1 · 长期验证</span>
+              <strong>上下各 5 美元策略</strong>
+            </div>
+            <small>下方点位做多，上方点位做空；仅统计先触发后已结算的样本</small>
+          </div>
+          <div class="bot-strategy-grid">
+            <div>
+              <span>已结算</span>
+              <strong id="bot-strategy-settled">0</strong>
+            </div>
+            <div>
+              <span>胜率</span>
+              <strong id="bot-strategy-win-rate">--</strong>
+            </div>
+            <div>
+              <span>胜 / 负</span>
+              <strong id="bot-strategy-record">0 / 0</strong>
+            </div>
+            <div>
+              <span>理论点数</span>
+              <strong id="bot-strategy-net">0.00</strong>
+            </div>
+            <div>
+              <span>单笔期望</span>
+              <strong id="bot-strategy-expectancy">--</strong>
+            </div>
+            <div>
+              <span>持仓 / 待触发</span>
+              <strong id="bot-strategy-live">0 / 0</strong>
+            </div>
+          </div>
+          <div id="bot-strategy-recent" class="bot-strategy-recent">
+            <p>还没有策略验证记录。</p>
+          </div>
+          <p class="bot-strategy-note">
+            按 Gate 最新价判断，不含点差、滑点和手续费；这是规则命中率，
+            不是实际净收益率。
+          </p>
+        </div>
       </section>
 
     </main>
@@ -398,6 +441,6 @@
       <p id="strategy-help-body"></p>
       <code id="strategy-help-formula"></code>
     </div>
-    <script src="/dashboard.js?v=18"></script>
+    <script src="/dashboard.js?v=19"></script>
   </body>
 </html>

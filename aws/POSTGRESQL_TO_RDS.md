@@ -13,7 +13,8 @@ Lightsail 实例，不是 AWS RDS，也不会产生新的 AWS 固定资源费用
 - 连接地址：`127.0.0.1:5432`
 - 密码认证：SCRAM-SHA-256
 - 应用连接配置：`/etc/xau-monitor/database.env`
-- 初始迁移：`db/migrations/001_initial.sql`
+- 当前迁移：`db/migrations/001_initial.sql` 至
+  `db/migrations/004_point_strategy_trials.sql`
 - 幂等初始化脚本：`aws/postgresql/bootstrap-local`
 - 自动备份：每天约 03:15 UTC（上海时间约 11:15），保留最近 7 天
 - 备份目录：`/var/backups/xau-monitor-postgresql`
@@ -50,6 +51,8 @@ SQL 文件，例如 `002_add_users.sql`，并向 `app.schema_migrations` 写入�
 当前 `app.strategy_snapshots` 是服务端策略历史的预留表。应用尚未开始自动
 写入；接入持久化时应限制写入频率，并制定按时间删除或归档的策略。
 `app.users` 和 `app.sessions` 已经用于生产登录，迁移时必须包含且需要验证。
+`app.price_alerts` 保存每日点位告警，`app.point_strategy_trials` 保存
+`LEVEL-5X5-V1` 的待触发、持仓、胜负和审计价格；这两张表也必须完整迁移。
 
 ## 迁移到 RDS 前的准备
 
@@ -106,6 +109,8 @@ ORDER BY version;
 SELECT count(*) FROM app.strategy_snapshots;
 SELECT count(*) FROM app.users;
 SELECT count(*) FROM app.sessions;
+SELECT count(*) FROM app.price_alerts;
+SELECT status, count(*) FROM app.point_strategy_trials GROUP BY status;
 ```
 
 确认数据后，把 `/etc/xau-monitor/database.env` 中的连接地址切换为 RDS

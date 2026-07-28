@@ -1053,6 +1053,92 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .bot-alert-row .near strong { color: var(--gold); }
 .bot-alert-row .above strong { color: var(--red); }
 .bot-alert-row .below strong { color: var(--green); }
+.bot-strategy {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 16px;
+  background: rgba(255,255,255,.012);
+}
+.bot-strategy-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+  margin-bottom: 12px;
+}
+.bot-strategy-head span,
+.bot-strategy-grid span,
+.bot-trial span {
+  display: block;
+  color: var(--muted);
+  font-size: 9px;
+}
+.bot-strategy-head strong {
+  display: block;
+  margin-top: 4px;
+  color: var(--text);
+  font-size: 14px;
+}
+.bot-strategy-head small {
+  max-width: 520px;
+  color: #687174;
+  font-size: 10px;
+  line-height: 1.5;
+  text-align: right;
+}
+.bot-strategy-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 8px;
+}
+.bot-strategy-grid > div {
+  min-width: 0;
+  border: 1px solid rgba(255,255,255,.045);
+  border-radius: 9px;
+  padding: 10px;
+  background: rgba(0,0,0,.12);
+}
+.bot-strategy-grid strong {
+  display: block;
+  margin-top: 5px;
+  color: var(--gold);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+}
+.bot-strategy-recent {
+  display: grid;
+  gap: 7px;
+  margin-top: 12px;
+}
+.bot-strategy-recent > p {
+  margin: 0;
+  color: #687174;
+  font-size: 10px;
+}
+.bot-trial {
+  display: grid;
+  grid-template-columns: minmax(70px, .6fr) repeat(4, minmax(78px, 1fr));
+  gap: 8px;
+  border-top: 1px solid rgba(255,255,255,.045);
+  padding-top: 8px;
+}
+.bot-trial strong {
+  display: block;
+  margin-top: 3px;
+  color: var(--text);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+.bot-trial .win strong { color: var(--green); }
+.bot-trial .loss strong { color: var(--red); }
+.bot-trial .open strong { color: var(--gold); }
+.bot-strategy-note {
+  margin: 12px 0 0;
+  color: #687174;
+  font-size: 9px;
+  line-height: 1.5;
+}
 .levels-card, .notes-card { padding: 22px 24px; }
 .level-row { display: flex; justify-content: space-between; padding: 13px 0; border-top: 1px solid var(--line); font-size: 13px; }
 .level-row span { color: var(--muted); }
@@ -1088,6 +1174,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   .metrics-grid { grid-template-columns: 1fr; }
   .volume-grid { grid-template-columns: repeat(2, 1fr); }
   .bot-layout { grid-template-columns: 1fr; }
+  .bot-strategy-grid { grid-template-columns: repeat(3, 1fr); }
   .scalp-layout { grid-template-columns: 1fr; }
   .trade-levels { grid-template-columns: repeat(2, 1fr); }
   .strategy-flow {
@@ -1120,6 +1207,10 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   .bot-card { padding: 18px; }
   .bot-meta-grid { grid-template-columns: 1fr; }
   .bot-alert-row { grid-template-columns: repeat(2, 1fr); }
+  .bot-strategy-head { align-items: flex-start; flex-direction: column; }
+  .bot-strategy-head small { text-align: left; }
+  .bot-strategy-grid { grid-template-columns: repeat(2, 1fr); }
+  .bot-trial { grid-template-columns: repeat(2, 1fr); }
   .scalp-card { padding: 18px; }
   .scalp-heading { gap: 12px; }
   .scalp-state { flex-direction: column; align-items: flex-end; gap: 3px; border: 0; padding: 0; }

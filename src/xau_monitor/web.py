@@ -572,10 +572,43 @@ def make_handler(
                         "alert_limit": alert["alert_limit"],
                         "distance": alert.get("distance"),
                         "expires_at": alert["expires_at"].isoformat(),
+                        "strategy": alert.get("strategy"),
                     }
                     for alert in payload["alerts"]
                 ],
+                "strategy": self._serialize_strategy_stats(payload["strategy"]),
             }
+
+        def _serialize_strategy_stats(
+            self,
+            payload: dict[str, Any],
+        ) -> dict[str, Any]:
+            result = dict(payload)
+            for key in ("tracking_since", "last_resolved_at"):
+                value = result.get(key)
+                result[key] = value.isoformat() if value else None
+            result["recent"] = [
+                {
+                    **trial,
+                    "created_at": (
+                        trial["created_at"].isoformat()
+                        if trial.get("created_at")
+                        else None
+                    ),
+                    "triggered_at": (
+                        trial["triggered_at"].isoformat()
+                        if trial.get("triggered_at")
+                        else None
+                    ),
+                    "resolved_at": (
+                        trial["resolved_at"].isoformat()
+                        if trial.get("resolved_at")
+                        else None
+                    ),
+                }
+                for trial in payload.get("recent", [])
+            ]
+            return result
 
         def _login(self) -> None:
             try:

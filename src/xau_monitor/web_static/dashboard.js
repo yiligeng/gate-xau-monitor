@@ -328,8 +328,8 @@ const CALENDAR_PIXELS_PER_HOUR = 132;
 const CALENDAR_CARD_MIN_WIDTH = 132;
 const CALENDAR_CARD_MAX_WIDTH = 230;
 const CALENDAR_CARD_GAP = 8;
-const CALENDAR_LANE_HEIGHT = 74;
-const CALENDAR_CARD_TOP_OFFSET = 8;
+const CALENDAR_LANE_HEIGHT = 68;
+const CALENDAR_CARD_TOP_OFFSET = 7;
 
 function calendarStartMs(item) {
   const value = item?.start || item?.time;
@@ -451,11 +451,10 @@ function timelineItemHtml(timelineItem) {
     return `
       <div class="timeline-item event ${tone} ${item.status}" style="${style}">
         <div class="calendar-chip-top">
-          <time>${escapeHtml(item.time_label)}</time>
+          <span>${escapeHtml(item.title)}</span>
           <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
         </div>
-        <strong>${escapeHtml(item.title)}</strong>
-        <span>${escapeHtml(item.impact)} · ${escapeHtml(item.source)}</span>
+        <strong>${escapeHtml(item.time_label)} · ${escapeHtml(item.source)}</strong>
       </div>
     `;
   }
@@ -470,8 +469,7 @@ function timelineItemHtml(timelineItem) {
         <span>${escapeHtml(item.title)}</span>
         <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
       </div>
-      <strong>${escapeHtml(item.time_label)}</strong>
-      <small>${escapeHtml(typeLabel)} · ${escapeHtml(item.note)}</small>
+      <strong>${escapeHtml(item.time_label)} · ${escapeHtml(item.note)}</strong>
     </div>
   `;
 }

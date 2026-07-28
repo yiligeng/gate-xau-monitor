@@ -429,8 +429,9 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   left: var(--left);
   top: 0;
   transform: translateX(-50%);
-  color: #687174;
-  font-size: 9px;
+  color: #aab2b4;
+  font-size: 10px;
+  font-weight: 800;
   font-variant-numeric: tabular-nums;
 }
 .timeline-tick i {
@@ -439,7 +440,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   left: 50%;
   width: 1px;
   height: var(--tick-height, 205px);
-  background: rgba(255,255,255,.035);
+  background: rgba(255,255,255,.06);
 }
 .timeline-row-title {
   display: flex;
@@ -460,8 +461,8 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .range-title span { color: var(--green); }
 .timeline-row {
   position: relative;
-  min-height: 74px;
-  height: 74px;
+  min-height: 68px;
+  height: 68px;
   border: 1px solid rgba(255,255,255,.045);
   border-radius: 11px;
   background: rgba(0,0,0,.14);
@@ -481,11 +482,11 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   top: var(--top);
   box-sizing: border-box;
   width: var(--width);
-  height: 58px;
+  height: 54px;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 10px;
-  padding: 7px 9px;
+  padding: 7px 9px 6px;
   background: rgba(255,255,255,.015);
 }
 .timeline-item.active,
@@ -496,13 +497,13 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .timeline-item.event,
 .timeline-item.event_window {
   border-color: rgba(255,89,109,.24);
-  background: rgba(255,89,109,.045);
+  background: rgba(255,89,109,.018);
 }
 .timeline-item.event.near,
 .timeline-item.event_window.active,
 .timeline-item.event_window.near {
-  border-color: rgba(255,89,109,.7);
-  background: rgba(255,89,109,.11);
+  border-color: rgba(255,89,109,.52);
+  background: rgba(255,89,109,.04);
 }
 .timeline-item.window {
   border-color: rgba(38,214,164,.26);
@@ -514,7 +515,7 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .timeline-item.volatility.critical {
   border-color: rgba(255,89,109,.26);
-  background: rgba(255,89,109,.04);
+  background: rgba(255,89,109,.018);
 }
 .timeline-item.past { opacity: .48; }
 .calendar-chip-top {
@@ -540,20 +541,15 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 }
 .timeline-item strong {
   display: block;
-  margin: 3px 0;
+  margin: 6px 0 0;
   overflow: hidden;
   color: var(--text);
   font-size: 11px;
+  line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.timeline-item time {
-  display: block;
-  color: var(--gold);
-  font-size: 9px;
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-}
+.timeline-item time { font-variant-numeric: tabular-nums; }
 .timeline-item.critical strong { color: var(--red); }
 .timeline-item.high strong { color: var(--gold); }
 .timeline-item.range .calendar-chip-top span,

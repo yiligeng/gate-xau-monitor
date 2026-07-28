@@ -164,7 +164,7 @@ systemd 从下面的 root-only 文件加载数据库连接：
 - 网页：主仪表盘“免费实时量能”下方的“机器人点位告警”面板可查看、覆盖
   保存或取消同一企业微信会话的今日点位
 - 网页 API：`GET /api/bot/alerts`、`POST /api/bot/alerts`、
-  `POST /api/bot/alerts/cancel`
+  `POST /api/bot/alerts/cancel`、`GET /api/bot/strategy-stats`
 - 存储：`app.price_alerts`、`app.point_strategy_trials`
 - 有效期：北京时间当天 24 点
 - 告警：距离点位小于等于 3 美元，最多 2 次，默认两次至少间隔 60 秒
@@ -184,7 +184,12 @@ systemd 从下面的 root-only 文件加载数据库连接：
 - 使用 Gate `last` 最新价，不含点差、滑点和手续费；统计是规则命中率，
   不是实际净收益率
 - 机器人循环按新报价 sequence 检查，内部 0.1 秒轮询，减少短暂触达漏记
-- 网页机器人面板展示累计胜率、理论点数、单笔期望和最近逐笔记录
+- 网页机器人面板分为累计总览、每日趋势/日表和逐笔审计
+- 累计总览默认包含全部日期，可按做多/做空筛选
+- 每日统计按北京时间 `setup_day`（点位设置日）归属，可看 7/30/90/365 天
+- 点击某日可筛选逐笔记录；状态和方向筛选使用同一套指标口径
+- 逐笔表使用基于递减 `id` 的不透明游标分页，不使用 `OFFSET`
+- 相邻点位可能由同一波行情触发，不应视为完全独立样本
 
 2026-07-28 上线迁移时，24 条已有黄金告警中有 22 条仍活跃并被回填为
 `pending`；另外 2 条已经触达，因缺少触达后的历史逐价数据，没有伪造输赢。
@@ -347,8 +352,9 @@ Schema：`app`
 - `db/migrations/002_auth.sql`
 - `db/migrations/003_price_alerts.sql`
 - `db/migrations/004_point_strategy_trials.sql`
+- `db/migrations/005_strategy_dashboard_indexes.sql`
 
-当前 schema version：4。
+当前 schema version：5。
 
 表：
 
@@ -376,6 +382,12 @@ Schema：`app`
 - 浏览器模拟交易日志
 
 `app.strategy_snapshots` 已创建，但在 2026-07-28 仍为 0 行。
+
+`app.point_strategy_trials.setup_day` 固化北京时间的点位设置日。生产索引：
+
+- `point_strategy_trials_daily_idx`：会话、市场、设置日、方向、状态，
+  服务每日聚合
+- `point_strategy_trials_page_idx`：会话、市场、递减 ID，服务稳定游标分页
 
 ### 备份
 
@@ -438,7 +450,7 @@ bash -n aws/postgresql/xau-monitor-db-backup
 git diff --check
 ```
 
-2026-07-28：29 项 unittest 全部通过。
+2026-07-28：31 项 unittest 全部通过。
 
 测试覆盖：
 

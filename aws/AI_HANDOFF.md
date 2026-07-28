@@ -88,7 +88,7 @@ It listens on `127.0.0.1:8765` locally.
   SCRAM-SHA-256 password authentication.
 - The local database and application role are both named `xau_monitor`. The
   role is not a superuser and cannot create databases, roles, or replication.
-  The schema version is `4`, under the `app` schema.
+  The schema version is `5`, under the `app` schema.
 - The database connection string is stored only in
   `/etc/xau-monitor/database.env`, owned by `root:root` with mode `600`.
   Never print, copy, commit, or upload this file or its value.
@@ -106,6 +106,10 @@ It listens on `127.0.0.1:8765` locally.
   triggered trial is tracked to a fixed 5 USD stop or 5 USD target. Win rate
   excludes pending, expired, replaced, and cancelled trials. The price basis
   is Gate `last`, without spread, slippage, or fees.
+- The authenticated dashboard exposes cumulative results, daily results by
+  Asia/Shanghai setup day, and cursor-paginated trial audit rows through
+  `GET /api/bot/strategy-stats`. Migration 005 adds `setup_day` plus dedicated
+  daily-aggregation and descending-ID pagination indexes.
 - The initial account is `owner`. Its random initial password is stored in the
   deploying Mac's login keychain under service
   `sheshetrip.fun-user-login` and account `owner`. Never print or copy it into

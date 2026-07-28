@@ -68,11 +68,16 @@ class WebAuthenticationTests(unittest.TestCase):
         dashboard_response.read()
 
     def test_market_api_requires_session(self) -> None:
-        self.connection.request("GET", "/api/snapshot?market=btc")
-        response = self.connection.getresponse()
-        payload = json.loads(response.read())
-        self.assertEqual(response.status, 401)
-        self.assertFalse(payload["ok"])
+        for path in (
+            "/api/snapshot?market=btc",
+            "/api/bot/strategy-stats?market=xau&chat_id=test",
+        ):
+            with self.subTest(path=path):
+                self.connection.request("GET", path)
+                response = self.connection.getresponse()
+                payload = json.loads(response.read())
+                self.assertEqual(response.status, 401)
+                self.assertFalse(payload["ok"])
 
     def test_login_sets_host_only_secure_session_cookie(self) -> None:
         body = json.dumps(

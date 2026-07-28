@@ -374,6 +374,9 @@ def make_handler(
             if path == "/api/bot/alerts":
                 self._bot_alerts_get(state)
                 return
+            if path == "/api/bot/strategy-stats":
+                self._bot_strategy_dashboard_get()
+                return
             if path in {"/api/snapshot", "/api/quote"}:
                 payload = state.payload()
                 if path == "/api/quote" and payload.get("ok"):
@@ -467,6 +470,38 @@ def make_handler(
                 self._send_error_json(503, "机器人点位读取失败")
                 return
             self._send_json({"ok": True} | self._serialize_alert_state(state_payload))
+
+        def _bot_strategy_dashboard_get(self) -> None:
+            if alert_store is None:
+                self._send_error_json(503, "点位策略数据库未启用")
+                return
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                market_id = query.get("market", ["xau"])[0]
+                chat_id = query.get("chat_id", [""])[0].strip()
+                if market_id not in states:
+                    raise ValueError("unknown market")
+                if not chat_id or len(chat_id) > 256:
+                    raise ValueError("invalid chat")
+                payload = alert_store.strategy_dashboard(
+                    chat_id,
+                    market_id,
+                    days=int(query.get("days", ["30"])[0]),
+                    direction=query.get("direction", [""])[0],
+                    status=query.get("status", [""])[0],
+                    setup_day=query.get("setup_day", [""])[0],
+                    cursor=query.get("cursor", [""])[0] or None,
+                    limit=int(query.get("limit", ["20"])[0]),
+                )
+            except (TypeError, ValueError):
+                self._send_error_json(400, "统计筛选或分页参数无效")
+                return
+            except Exception:
+                self._send_error_json(503, "点位策略统计读取失败")
+                return
+            response = self._serialize_strategy_dashboard(payload)
+            response["market"] = market_id
+            self._send_json({"ok": True} | response)
 
         def _bot_alerts_replace(self) -> None:
             if alert_store is None:
@@ -609,6 +644,56 @@ def make_handler(
                 for trial in payload.get("recent", [])
             ]
             return result
+
+        def _serialize_strategy_dashboard(
+            self,
+            payload: dict[str, Any],
+        ) -> dict[str, Any]:
+            return {
+                "generated_at": payload["generated_at"].isoformat(),
+                "daily_timezone": payload["daily_timezone"],
+                "daily_grain": payload["daily_grain"],
+                "days": payload["days"],
+                "summary": self._serialize_strategy_stats(payload["summary"]),
+                "daily": [
+                    {
+                        **row,
+                        "setup_day": row["setup_day"].isoformat(),
+                    }
+                    for row in payload["daily"]
+                ],
+                "trials": [
+                    {
+                        **trial,
+                        "setup_day": trial["setup_day"].isoformat(),
+                        "created_at": (
+                            trial["created_at"].isoformat()
+                            if trial.get("created_at")
+                            else None
+                        ),
+                        "triggered_at": (
+                            trial["triggered_at"].isoformat()
+                            if trial.get("triggered_at")
+                            else None
+                        ),
+                        "resolved_at": (
+                            trial["resolved_at"].isoformat()
+                            if trial.get("resolved_at")
+                            else None
+                        ),
+                    }
+                    for trial in payload["trials"]
+                ],
+                "page": payload["page"],
+                "filters": {
+                    **payload["filters"],
+                    "setup_day": (
+                        payload["filters"]["setup_day"].isoformat()
+                        if payload["filters"].get("setup_day")
+                        else None
+                    ),
+                },
+            }
 
         def _login(self) -> None:
             try:

@@ -2,7 +2,12 @@ import unittest
 
 from xau_monitor.price_alerts import (
     build_point_strategy_plan,
+    decode_trial_cursor,
+    encode_trial_cursor,
     is_breached,
+    normalize_setup_day,
+    normalize_strategy_direction,
+    normalize_strategy_status,
     parse_today_levels_command,
     should_alert,
     strategy_status_for_price,
@@ -159,6 +164,25 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertIn("暂无已结算样本", reply)
         self.assertIn("待触发：3", reply)
         self.assertIn("不含点差、滑点和手续费", reply)
+
+    def test_trial_cursor_round_trip_and_validation(self) -> None:
+        cursor = encode_trial_cursor(123456)
+
+        self.assertEqual(decode_trial_cursor(cursor), 123456)
+        for invalid in ("", "not-a-cursor", encode_trial_cursor(7) + "!"):
+            with self.assertRaises(ValueError):
+                decode_trial_cursor(invalid)
+
+    def test_dashboard_filter_validation(self) -> None:
+        self.assertEqual(normalize_strategy_direction("LONG"), "long")
+        self.assertEqual(normalize_strategy_status("win"), "win")
+        self.assertEqual(str(normalize_setup_day("2026-07-28")), "2026-07-28")
+        with self.assertRaises(ValueError):
+            normalize_strategy_direction("sideways")
+        with self.assertRaises(ValueError):
+            normalize_strategy_status("unknown")
+        with self.assertRaises(ValueError):
+            normalize_setup_day("2026-02-31")
 
 
 if __name__ == "__main__":

@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=19">
+    <link rel="stylesheet" href="/dashboard.css?v=20">
   </head>
   <body>
     <main class="shell">
@@ -394,9 +394,31 @@
           <div class="bot-strategy-head">
             <div>
               <span>LEVEL-5X5-V1 · 长期验证</span>
-              <strong>上下各 5 美元策略</strong>
+              <strong>累计胜率与每日表现</strong>
             </div>
-            <small>下方点位做多，上方点位做空；仅统计先触发后已结算的样本</small>
+            <small id="bot-strategy-freshness">
+              下方点位做多，上方点位做空；仅统计先触发后已结算的样本
+            </small>
+          </div>
+          <div class="bot-strategy-controls">
+            <label>
+              <span>方向</span>
+              <select id="bot-strategy-direction">
+                <option value="">全部方向</option>
+                <option value="long">只看做多</option>
+                <option value="short">只看做空</option>
+              </select>
+            </label>
+            <label>
+              <span>每日范围</span>
+              <select id="bot-strategy-days">
+                <option value="7">最近 7 天</option>
+                <option value="30" selected>最近 30 天</option>
+                <option value="90">最近 90 天</option>
+                <option value="365">最近 365 天</option>
+              </select>
+            </label>
+            <p id="bot-strategy-scope">累计指标：全部日期 · 全部方向</p>
           </div>
           <div class="bot-strategy-grid">
             <div>
@@ -424,12 +446,73 @@
               <strong id="bot-strategy-live">0 / 0</strong>
             </div>
           </div>
-          <div id="bot-strategy-recent" class="bot-strategy-recent">
-            <p>还没有策略验证记录。</p>
+
+          <div class="bot-strategy-daily">
+            <div class="bot-subhead">
+              <div>
+                <span>DAILY TREND · ASIA/SHANGHAI</span>
+                <strong>每日胜率（按点位设置日）</strong>
+              </div>
+              <small>柱高代表已结算样本，折线代表胜率</small>
+            </div>
+            <div id="bot-strategy-chart" class="bot-strategy-chart">
+              <p>正在读取每日统计…</p>
+            </div>
+            <div class="bot-daily-table-wrap">
+              <table class="bot-daily-table">
+                <thead>
+                  <tr>
+                    <th>日期</th>
+                    <th>已结算</th>
+                    <th>胜 / 负</th>
+                    <th>胜率</th>
+                    <th>理论点数</th>
+                    <th>持仓 / 待触发</th>
+                    <th>未触发</th>
+                  </tr>
+                </thead>
+                <tbody id="bot-strategy-daily-body">
+                  <tr><td colspan="7">还没有每日样本。</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="bot-strategy-detail">
+            <div class="bot-subhead bot-detail-head">
+              <div>
+                <span>TRIAL AUDIT · CURSOR PAGINATION</span>
+                <strong id="bot-strategy-detail-title">逐笔记录</strong>
+              </div>
+              <div class="bot-detail-controls">
+                <select id="bot-strategy-status" aria-label="筛选试验状态">
+                  <option value="">全部状态</option>
+                  <option value="win">胜</option>
+                  <option value="loss">负</option>
+                  <option value="open">持仓中</option>
+                  <option value="pending">待触发</option>
+                  <option value="expired">未触发</option>
+                  <option value="replaced">已覆盖</option>
+                  <option value="cancelled">已取消</option>
+                </select>
+                <button id="bot-strategy-clear-day" type="button" hidden>
+                  清除日期
+                </button>
+              </div>
+            </div>
+            <div id="bot-strategy-recent" class="bot-strategy-recent">
+              <p>还没有策略验证记录。</p>
+            </div>
+            <div class="bot-strategy-pagination">
+              <button id="bot-strategy-prev" type="button" disabled>上一页</button>
+              <span id="bot-strategy-page">第 1 页</span>
+              <button id="bot-strategy-next" type="button" disabled>下一页</button>
+            </div>
           </div>
           <p class="bot-strategy-note">
             按 Gate 最新价判断，不含点差、滑点和手续费；这是规则命中率，
-            不是实际净收益率。
+            不是实际净收益率。相邻点位可能由同一次行情波动触发，不能当作
+            完全独立的统计样本。
           </p>
         </div>
       </section>
@@ -441,6 +524,6 @@
       <p id="strategy-help-body"></p>
       <code id="strategy-help-formula"></code>
     </div>
-    <script src="/dashboard.js?v=19"></script>
+    <script src="/dashboard.js?v=21"></script>
   </body>
 </html>

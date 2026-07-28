@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import base64
+import binascii
 import re
 from dataclasses import dataclass
-from datetime import datetime, time, timedelta, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from decimal import Decimal
 from typing import Any
 from zoneinfo import ZoneInfo
@@ -18,6 +20,17 @@ POINT_STRATEGY_VERSION = "LEVEL-5X5-V1"
 POINT_STRATEGY_RISK = Decimal("5.00")
 POINT_STRATEGY_REWARD = Decimal("5.00")
 PRICE_PRECISION = Decimal("0.01")
+POINT_STRATEGY_DIRECTIONS = {"long", "short"}
+POINT_STRATEGY_STATUSES = {
+    "pending",
+    "open",
+    "win",
+    "loss",
+    "expired",
+    "replaced",
+    "cancelled",
+}
+DASHBOARD_DAY_WINDOWS = {7, 30, 90, 365}
 
 
 @dataclass(frozen=True)
@@ -120,11 +133,11 @@ class PriceAlertStore:
                             price_alert_id, chat_id, market, strategy_version,
                             direction, initial_price, entry_price,
                             stop_loss, take_profit, risk_points, reward_points,
-                            entry_expires_at
+                            entry_expires_at, setup_day
                         )
                         VALUES (
                             %s, %s, %s, %s, %s, %s, %s,
-                            %s, %s, %s, %s, %s
+                            %s, %s, %s, %s, %s, %s
                         )
                         """,
                         (
@@ -140,6 +153,7 @@ class PriceAlertStore:
                             float(POINT_STRATEGY_RISK),
                             float(POINT_STRATEGY_REWARD),
                             expires_at,
+                            now.astimezone(SHANGHAI).date(),
                         ),
                     )
                 rows.append(
@@ -276,13 +290,27 @@ class PriceAlertStore:
         chat_id: str,
         market: str,
         recent_limit: int = 12,
+        direction: str | None = None,
     ) -> dict[str, Any]:
         if not chat_id:
             return empty_strategy_stats()
-        limit = max(1, min(int(recent_limit), 50))
+        normalized_direction = normalize_strategy_direction(direction)
+        direction_condition = (
+            "\n                  AND direction = %s"
+            if normalized_direction
+            else ""
+        )
+        query_parameters: list[Any] = [
+            chat_id,
+            market,
+            POINT_STRATEGY_VERSION,
+        ]
+        if normalized_direction:
+            query_parameters.append(normalized_direction)
+        limit = max(0, min(int(recent_limit), 50))
         with self._connect() as connection:
             aggregate = connection.execute(
-                """
+                f"""
                 SELECT
                     count(*) FILTER (WHERE status = 'win') AS wins,
                     count(*) FILTER (WHERE status = 'loss') AS losses,
@@ -307,11 +335,12 @@ class PriceAlertStore:
                 WHERE chat_id = %s
                   AND market = %s
                   AND strategy_version = %s
+                  {direction_condition}
                 """,
-                (chat_id, market, POINT_STRATEGY_VERSION),
+                tuple(query_parameters),
             ).fetchone()
             direction_rows = connection.execute(
-                """
+                f"""
                 SELECT direction,
                        count(*) FILTER (WHERE status = 'win') AS wins,
                        count(*) FILTER (WHERE status = 'loss') AS losses
@@ -319,28 +348,32 @@ class PriceAlertStore:
                 WHERE chat_id = %s
                   AND market = %s
                   AND strategy_version = %s
+                  {direction_condition}
                 GROUP BY direction
                 ORDER BY direction
                 """,
-                (chat_id, market, POINT_STRATEGY_VERSION),
+                tuple(query_parameters),
             ).fetchall()
-            recent_rows = connection.execute(
-                """
-                SELECT id, direction, initial_price, entry_price,
-                       stop_loss, take_profit, status,
-                       trigger_observed_price, exit_observed_price,
-                       created_at, triggered_at, resolved_at
-                FROM app.point_strategy_trials
-                WHERE chat_id = %s
-                  AND market = %s
-                  AND strategy_version = %s
-                ORDER BY
-                    COALESCE(resolved_at, triggered_at, created_at) DESC,
-                    id DESC
-                LIMIT %s
-                """,
-                (chat_id, market, POINT_STRATEGY_VERSION, limit),
-            ).fetchall()
+            recent_rows = []
+            if limit:
+                recent_rows = connection.execute(
+                    f"""
+                    SELECT id, direction, initial_price, entry_price,
+                           stop_loss, take_profit, status,
+                           trigger_observed_price, exit_observed_price,
+                           created_at, triggered_at, resolved_at
+                    FROM app.point_strategy_trials
+                    WHERE chat_id = %s
+                      AND market = %s
+                      AND strategy_version = %s
+                      {direction_condition}
+                    ORDER BY
+                        COALESCE(resolved_at, triggered_at, created_at) DESC,
+                        id DESC
+                    LIMIT %s
+                    """,
+                    tuple(query_parameters + [limit]),
+                ).fetchall()
 
         wins = int(aggregate[0] or 0) if aggregate else 0
         losses = int(aggregate[1] or 0) if aggregate else 0
@@ -401,6 +434,193 @@ class PriceAlertStore:
                 }
                 for row in recent_rows
             ],
+        }
+
+    def strategy_dashboard(
+        self,
+        chat_id: str,
+        market: str,
+        *,
+        days: int = 30,
+        direction: str | None = None,
+        status: str | None = None,
+        setup_day: date | str | None = None,
+        cursor: str | None = None,
+        limit: int = 20,
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        if not chat_id:
+            raise ValueError("chat_id is required")
+        if days not in DASHBOARD_DAY_WINDOWS:
+            raise ValueError("unsupported day window")
+        normalized_direction = normalize_strategy_direction(direction)
+        normalized_status = normalize_strategy_status(status)
+        normalized_day = normalize_setup_day(setup_day)
+        cursor_id = decode_trial_cursor(cursor) if cursor else None
+        page_limit = max(1, min(int(limit), 100))
+        now = now or utc_now()
+        today = now.astimezone(SHANGHAI).date()
+        cutoff_day = today - timedelta(days=days - 1)
+
+        summary = self.strategy_stats(
+            chat_id,
+            market,
+            recent_limit=0,
+            direction=normalized_direction,
+        )
+        daily_conditions = [
+            "chat_id = %s",
+            "market = %s",
+            "strategy_version = %s",
+            "setup_day >= %s",
+        ]
+        daily_parameters: list[Any] = [
+            chat_id,
+            market,
+            POINT_STRATEGY_VERSION,
+            cutoff_day,
+        ]
+        if normalized_direction:
+            daily_conditions.append("direction = %s")
+            daily_parameters.append(normalized_direction)
+
+        detail_conditions = [
+            "chat_id = %s",
+            "market = %s",
+            "strategy_version = %s",
+        ]
+        detail_parameters: list[Any] = [
+            chat_id,
+            market,
+            POINT_STRATEGY_VERSION,
+        ]
+        if normalized_direction:
+            detail_conditions.append("direction = %s")
+            detail_parameters.append(normalized_direction)
+        if normalized_status:
+            detail_conditions.append("status = %s")
+            detail_parameters.append(normalized_status)
+        if normalized_day:
+            detail_conditions.append("setup_day = %s")
+            detail_parameters.append(normalized_day)
+        if cursor_id is not None:
+            detail_conditions.append("id < %s")
+            detail_parameters.append(cursor_id)
+
+        with self._connect() as connection:
+            daily_rows = connection.execute(
+                f"""
+                SELECT
+                    setup_day,
+                    count(*) FILTER (WHERE status = 'win') AS wins,
+                    count(*) FILTER (WHERE status = 'loss') AS losses,
+                    count(*) FILTER (WHERE status = 'open') AS open_count,
+                    count(*) FILTER (WHERE status = 'pending') AS pending_count,
+                    count(*) FILTER (WHERE status = 'expired') AS expired_count,
+                    count(*) FILTER (WHERE status = 'replaced') AS replaced_count,
+                    count(*) FILTER (WHERE status = 'cancelled') AS cancelled_count,
+                    COALESCE(
+                        sum(
+                            CASE status
+                                WHEN 'win' THEN reward_points
+                                WHEN 'loss' THEN -risk_points
+                                ELSE 0
+                            END
+                        ),
+                        0
+                    ) AS net_points
+                FROM app.point_strategy_trials
+                WHERE {" AND ".join(daily_conditions)}
+                GROUP BY setup_day
+                ORDER BY setup_day
+                """,
+                tuple(daily_parameters),
+            ).fetchall()
+            detail_rows = connection.execute(
+                f"""
+                SELECT id, setup_day, direction, initial_price, entry_price,
+                       stop_loss, take_profit, status,
+                       trigger_observed_price, exit_observed_price,
+                       created_at, triggered_at, resolved_at
+                FROM app.point_strategy_trials
+                WHERE {" AND ".join(detail_conditions)}
+                ORDER BY id DESC
+                LIMIT %s
+                """,
+                tuple(detail_parameters + [page_limit + 1]),
+            ).fetchall()
+
+        daily = []
+        for row in daily_rows:
+            wins = int(row[1] or 0)
+            losses = int(row[2] or 0)
+            settled = wins + losses
+            net_points = float(row[8] or 0)
+            daily.append(
+                {
+                    "setup_day": row[0],
+                    "wins": wins,
+                    "losses": losses,
+                    "settled": settled,
+                    "win_rate": wins / settled * 100 if settled else None,
+                    "open": int(row[3] or 0),
+                    "pending": int(row[4] or 0),
+                    "expired": int(row[5] or 0),
+                    "replaced": int(row[6] or 0),
+                    "cancelled": int(row[7] or 0),
+                    "net_points": net_points,
+                    "expectancy_points": (
+                        net_points / settled if settled else None
+                    ),
+                }
+            )
+
+        has_more = len(detail_rows) > page_limit
+        page_rows = detail_rows[:page_limit]
+        trials = [
+            {
+                "id": row[0],
+                "setup_day": row[1],
+                "direction": row[2],
+                "initial_price": float(row[3]),
+                "entry_price": float(row[4]),
+                "stop_loss": float(row[5]),
+                "take_profit": float(row[6]),
+                "status": row[7],
+                "trigger_observed_price": (
+                    float(row[8]) if row[8] is not None else None
+                ),
+                "exit_observed_price": (
+                    float(row[9]) if row[9] is not None else None
+                ),
+                "created_at": row[10],
+                "triggered_at": row[11],
+                "resolved_at": row[12],
+            }
+            for row in page_rows
+        ]
+        return {
+            "generated_at": now,
+            "daily_timezone": "Asia/Shanghai",
+            "daily_grain": "setup_day",
+            "days": days,
+            "summary": summary,
+            "daily": daily,
+            "trials": trials,
+            "page": {
+                "limit": page_limit,
+                "has_more": has_more,
+                "next_cursor": (
+                    encode_trial_cursor(int(page_rows[-1][0]))
+                    if has_more and page_rows
+                    else None
+                ),
+            },
+            "filters": {
+                "direction": normalized_direction,
+                "status": normalized_status,
+                "setup_day": normalized_day,
+            },
         }
 
     def web_state(
@@ -724,6 +944,66 @@ def empty_strategy_stats() -> dict[str, Any]:
         "by_direction": {},
         "recent": [],
     }
+
+
+def normalize_strategy_direction(direction: str | None) -> str | None:
+    normalized = str(direction or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized not in POINT_STRATEGY_DIRECTIONS:
+        raise ValueError("invalid strategy direction")
+    return normalized
+
+
+def normalize_strategy_status(status: str | None) -> str | None:
+    normalized = str(status or "").strip().lower()
+    if not normalized:
+        return None
+    if normalized not in POINT_STRATEGY_STATUSES:
+        raise ValueError("invalid strategy status")
+    return normalized
+
+
+def normalize_setup_day(value: date | str | None) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.astimezone(SHANGHAI).date()
+    if isinstance(value, date):
+        return value
+    try:
+        return date.fromisoformat(str(value))
+    except ValueError as exc:
+        raise ValueError("invalid setup day") from exc
+
+
+def encode_trial_cursor(trial_id: int) -> str:
+    if trial_id <= 0:
+        raise ValueError("invalid trial cursor id")
+    payload = f"trial:{trial_id}".encode("ascii")
+    return base64.urlsafe_b64encode(payload).decode("ascii").rstrip("=")
+
+
+def decode_trial_cursor(cursor: str) -> int:
+    value = str(cursor or "").strip()
+    if not value or len(value) > 128:
+        raise ValueError("invalid trial cursor")
+    padding = "=" * (-len(value) % 4)
+    try:
+        decoded = base64.b64decode(
+            value + padding,
+            altchars=b"-_",
+            validate=True,
+        ).decode("ascii")
+    except (binascii.Error, UnicodeDecodeError) as exc:
+        raise ValueError("invalid trial cursor") from exc
+    prefix, separator, raw_id = decoded.partition(":")
+    if separator != ":" or prefix != "trial" or not raw_id.isdigit():
+        raise ValueError("invalid trial cursor")
+    trial_id = int(raw_id)
+    if trial_id <= 0:
+        raise ValueError("invalid trial cursor")
+    return trial_id
 
 
 def parse_today_levels_command(text: str) -> ParsedLevelCommand | None:

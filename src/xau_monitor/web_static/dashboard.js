@@ -223,6 +223,15 @@ let quoteTimer = null;
 let snapshotTimer = null;
 let botAlertsTimer = null;
 let botSelectedChatId = "";
+let botStrategyDirection = "";
+let botStrategyDays = 30;
+let botStrategyStatus = "";
+let botStrategyDay = "";
+let botStrategyCursor = "";
+let botStrategyNextCursor = "";
+let botStrategyPageHistory = [];
+let botStrategyPageNumber = 1;
+let botStrategyRequestSequence = 0;
 const clientTicks = [];
 let paperTrades = loadPaperTrades();
 const defaultIndicators = {
@@ -409,7 +418,17 @@ function setBotBusy(busy) {
     });
 }
 
-function renderBotStrategy(strategy = {}) {
+const BOT_STRATEGY_STATUS_LABELS = {
+  pending: "待触发",
+  open: "持仓中",
+  win: "胜",
+  loss: "负",
+  expired: "未触发",
+  replaced: "已覆盖",
+  cancelled: "已取消",
+};
+
+function renderBotStrategySummary(strategy = {}) {
   const settled = Number(strategy.settled || 0);
   const winRate = strategy.win_rate == null ? null : Number(strategy.win_rate);
   const expectancy = strategy.expectancy_points == null
@@ -439,28 +458,145 @@ function renderBotStrategy(strategy = {}) {
     "bot-strategy-live",
     `${Number(strategy.open || 0)} / ${Number(strategy.pending || 0)}`,
   );
+}
 
-  const recent = Array.isArray(strategy.recent) ? strategy.recent.slice(0, 8) : [];
-  const target = $("bot-strategy-recent");
+function strategyDayLabel(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return value || "--";
+  const [, month, day] = value.split("-");
+  return `${Number(month)}月${Number(day)}日`;
+}
+
+function strategyTimestampLabel(value) {
+  if (!value) return "--";
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return "--";
+  return timestamp.toLocaleString("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function strategySigned(value) {
+  const number = Number(value || 0);
+  return `${number >= 0 ? "+" : ""}${number.toFixed(2)}`;
+}
+
+function renderBotStrategyChart(daily = []) {
+  const target = $("bot-strategy-chart");
   if (!target) return;
-  if (!recent.length) {
-    target.innerHTML = "<p>还没有策略验证记录；新设置或当前仍活跃的点位会从现在开始记录。</p>";
+  if (!daily.length) {
+    target.innerHTML = "<p>所选范围内还没有点位样本。</p>";
     return;
   }
-  const statusLabels = {
-    pending: "待触发",
-    open: "持仓中",
-    win: "胜",
-    loss: "负",
-    expired: "未触发",
-    replaced: "已覆盖",
-    cancelled: "已取消",
-  };
-  target.innerHTML = recent.map((trial) => `
+  const settledTotal = daily.reduce((total, row) => total + Number(row.settled || 0), 0);
+  if (!settledTotal) {
+    const sampleTotal = daily.reduce(
+      (total, row) => total + Number(row.pending || 0) + Number(row.open || 0),
+      0,
+    );
+    target.innerHTML = `<p>已有 ${sampleTotal} 个点位样本，但还没有已结算胜负，暂时无法绘制胜率。</p>`;
+    return;
+  }
+  const width = Math.max(640, daily.length * 38);
+  const height = 220;
+  const padding = { left: 42, right: 18, top: 18, bottom: 32 };
+  const plotWidth = width - padding.left - padding.right;
+  const plotHeight = height - padding.top - padding.bottom;
+  const maxSettled = Math.max(1, ...daily.map((row) => Number(row.settled || 0)));
+  const step = daily.length > 1 ? plotWidth / (daily.length - 1) : 0;
+  const pointX = (index) => daily.length > 1
+    ? padding.left + index * step
+    : padding.left + plotWidth / 2;
+  const rateY = (rate) => padding.top + ((100 - rate) / 100) * plotHeight;
+  const barWidth = Math.max(8, Math.min(22, plotWidth / Math.max(daily.length, 1) * 0.55));
+  const labelEvery = Math.max(1, Math.ceil(daily.length / 8));
+  const settledRows = daily
+    .map((row, index) => ({ row, index }))
+    .filter(({ row }) => Number(row.settled || 0) > 0 && row.win_rate != null);
+  const linePoints = settledRows
+    .map(({ row, index }) => `${pointX(index).toFixed(1)},${rateY(Number(row.win_rate)).toFixed(1)}`)
+    .join(" ");
+  const grid = [0, 50, 100].map((rate) => {
+    const y = rateY(rate);
+    return `
+      <line class="bot-chart-grid" x1="${padding.left}" x2="${width - padding.right}" y1="${y}" y2="${y}"></line>
+      <text class="bot-chart-axis" x="${padding.left - 8}" y="${y + 3}" text-anchor="end">${rate}%</text>
+    `;
+  }).join("");
+  const bars = daily.map((row, index) => {
+    const settled = Number(row.settled || 0);
+    const barHeight = settled / maxSettled * plotHeight;
+    const x = pointX(index) - barWidth / 2;
+    const y = padding.top + plotHeight - barHeight;
+    return `
+      <rect class="bot-chart-bar" x="${x.toFixed(1)}" y="${y.toFixed(1)}"
+        width="${barWidth.toFixed(1)}" height="${barHeight.toFixed(1)}">
+        <title>${row.setup_day}：${settled}笔，胜率${row.win_rate == null ? "--" : `${Number(row.win_rate).toFixed(2)}%`}</title>
+      </rect>
+    `;
+  }).join("");
+  const points = settledRows.map(({ row, index }) => `
+    <circle class="bot-chart-point" cx="${pointX(index).toFixed(1)}"
+      cy="${rateY(Number(row.win_rate)).toFixed(1)}" r="4">
+      <title>${row.setup_day}：胜${row.wins}/负${row.losses}，胜率${Number(row.win_rate).toFixed(2)}%</title>
+    </circle>
+  `).join("");
+  const labels = daily.map((row, index) => {
+    if (index % labelEvery !== 0 && index !== daily.length - 1) return "";
+    return `<text class="bot-chart-axis" x="${pointX(index).toFixed(1)}" y="${height - 10}" text-anchor="middle">${row.setup_day.slice(5)}</text>`;
+  }).join("");
+  target.innerHTML = `
+    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="每日胜率和已结算样本趋势">
+      ${grid}
+      ${bars}
+      ${linePoints ? `<polyline class="bot-chart-line" points="${linePoints}"></polyline>` : ""}
+      ${points}
+      ${labels}
+    </svg>
+  `;
+}
+
+function renderBotStrategyDaily(daily = []) {
+  renderBotStrategyChart(daily);
+  const body = $("bot-strategy-daily-body");
+  if (!body) return;
+  if (!daily.length) {
+    body.innerHTML = '<tr><td colspan="7">所选范围内还没有每日样本。</td></tr>';
+    return;
+  }
+  body.innerHTML = [...daily].reverse().map((row) => `
+    <tr data-strategy-day="${row.setup_day}" class="${row.setup_day === botStrategyDay ? "active" : ""}">
+      <td>${strategyDayLabel(row.setup_day)}</td>
+      <td>${Number(row.settled || 0)}</td>
+      <td>${Number(row.wins || 0)} / ${Number(row.losses || 0)}</td>
+      <td>${row.win_rate == null ? "--" : `${Number(row.win_rate).toFixed(2)}%`}</td>
+      <td>${strategySigned(row.net_points)}</td>
+      <td>${Number(row.open || 0)} / ${Number(row.pending || 0)}</td>
+      <td>${Number(row.expired || 0)}</td>
+    </tr>
+  `).join("");
+}
+
+function renderBotStrategyTrials(trials = []) {
+  const target = $("bot-strategy-recent");
+  if (!target) return;
+  if (!trials.length) {
+    target.innerHTML = "<p>当前筛选条件下没有逐笔记录。</p>";
+    return;
+  }
+  target.innerHTML = trials.map((trial) => `
     <div class="bot-trial">
       <div class="${escapeHtml(trial.status || "")}">
         <span>${trial.direction === "long" ? "做多" : "做空"}</span>
-        <strong>${statusLabels[trial.status] || trial.status || "-"}</strong>
+        <strong>${BOT_STRATEGY_STATUS_LABELS[trial.status] || trial.status || "-"}</strong>
+      </div>
+      <div>
+        <span>设置日 / 时间</span>
+        <strong>${strategyDayLabel(trial.setup_day)}<br>${strategyTimestampLabel(trial.created_at)}</strong>
       </div>
       <div>
         <span>设置时价格</span>
@@ -475,11 +611,83 @@ function renderBotStrategy(strategy = {}) {
         <strong>${priceFormat.format(trial.stop_loss)} / ${priceFormat.format(trial.take_profit)}</strong>
       </div>
       <div>
-        <span>结算观察价</span>
-        <strong>${trial.exit_observed_price == null ? "--" : priceFormat.format(trial.exit_observed_price)}</strong>
+        <span>触发 / 结算观察价</span>
+        <strong>
+          ${trial.trigger_observed_price == null ? "--" : priceFormat.format(trial.trigger_observed_price)}
+          /
+          ${trial.exit_observed_price == null ? "--" : priceFormat.format(trial.exit_observed_price)}
+        </strong>
       </div>
     </div>
   `).join("");
+}
+
+function renderBotStrategyDashboard(data) {
+  renderBotStrategySummary(data.summary || {});
+  renderBotStrategyDaily(data.daily || []);
+  renderBotStrategyTrials(data.trials || []);
+  botStrategyNextCursor = data.page?.next_cursor || "";
+  $("bot-strategy-prev").disabled = botStrategyPageHistory.length === 0;
+  $("bot-strategy-next").disabled = !data.page?.has_more;
+  setText("bot-strategy-page", `第 ${botStrategyPageNumber} 页`);
+  setText(
+    "bot-strategy-detail-title",
+    botStrategyDay
+      ? `${strategyDayLabel(botStrategyDay)}逐笔记录`
+      : "逐笔记录",
+  );
+  const clearDay = $("bot-strategy-clear-day");
+  if (clearDay) clearDay.hidden = !botStrategyDay;
+  const directionLabel = botStrategyDirection === "long"
+    ? "只看做多"
+    : botStrategyDirection === "short"
+      ? "只看做空"
+      : "全部方向";
+  setText("bot-strategy-scope", `累计指标：全部日期 · ${directionLabel}`);
+  setText(
+    "bot-strategy-freshness",
+    `更新：${strategyTimestampLabel(data.generated_at)} · 每日按北京时间点位设置日归属`,
+  );
+}
+
+function resetBotStrategyPage() {
+  botStrategyCursor = "";
+  botStrategyNextCursor = "";
+  botStrategyPageHistory = [];
+  botStrategyPageNumber = 1;
+}
+
+async function refreshBotStrategyDashboard({ resetPage = false } = {}) {
+  if (resetPage) resetBotStrategyPage();
+  if (!botSelectedChatId) {
+    renderBotStrategySummary({});
+    renderBotStrategyDaily([]);
+    renderBotStrategyTrials([]);
+    return;
+  }
+  const requestSequence = ++botStrategyRequestSequence;
+  const query = new URLSearchParams({
+    market: activeMarket,
+    chat_id: botSelectedChatId,
+    days: String(botStrategyDays),
+    limit: "20",
+  });
+  if (botStrategyDirection) query.set("direction", botStrategyDirection);
+  if (botStrategyStatus) query.set("status", botStrategyStatus);
+  if (botStrategyDay) query.set("setup_day", botStrategyDay);
+  if (botStrategyCursor) query.set("cursor", botStrategyCursor);
+  try {
+    const response = await authorizedFetch(`/api/bot/strategy-stats?${query}`);
+    const data = await response.json();
+    if (!data.ok) throw new Error(data.error || "策略统计暂不可用");
+    if (requestSequence !== botStrategyRequestSequence) return;
+    if (data.market !== activeMarket) return;
+    renderBotStrategyDashboard(data);
+  } catch (error) {
+    if (requestSequence !== botStrategyRequestSequence) return;
+    const target = $("bot-strategy-chart");
+    if (target) target.innerHTML = `<p>${escapeHtml(error.message)}</p>`;
+  }
 }
 
 function renderBotAlerts(data) {
@@ -494,7 +702,7 @@ function renderBotAlerts(data) {
       ? `${data.alerts?.length || 0} 条活跃`
       : "等待会话",
   );
-  renderBotStrategy(data.strategy || {});
+  if (!botStrategyDirection) renderBotStrategySummary(data.strategy || {});
 
   const chatSelect = $("bot-chat-select");
   if (chatSelect) {
@@ -554,7 +762,11 @@ async function refreshBotAlerts(chatId = botSelectedChatId) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "机器人设置暂不可用");
     if (data.market !== activeMarket) return;
+    const previousChatId = botSelectedChatId;
     renderBotAlerts(data);
+    const chatChanged = previousChatId !== botSelectedChatId;
+    if (chatChanged) botStrategyDay = "";
+    await refreshBotStrategyDashboard({ resetPage: chatChanged });
   } catch (error) {
     setText("bot-state", "读取失败");
     setText("bot-feedback", error.message);
@@ -586,6 +798,8 @@ async function saveBotLevels(event) {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "保存失败");
     renderBotAlerts(data);
+    botStrategyDay = "";
+    await refreshBotStrategyDashboard({ resetPage: true });
     setText("bot-feedback", `已保存 ${data.saved_count || levels.length} 条今日点位。`);
   } catch (error) {
     setText("bot-feedback", error.message);
@@ -613,6 +827,8 @@ async function cancelBotLevels() {
     const data = await response.json();
     if (!data.ok) throw new Error(data.error || "取消失败");
     renderBotAlerts(data);
+    botStrategyDay = "";
+    await refreshBotStrategyDashboard({ resetPage: true });
     setText("bot-feedback", `已取消 ${data.cancelled_count || 0} 条今日点位。`);
   } catch (error) {
     setText("bot-feedback", error.message);
@@ -2010,6 +2226,8 @@ function switchMarket(nextMarket) {
   setText("bot-feedback", "");
   setText("last-price", "----.--");
   botSelectedChatId = "";
+  botStrategyDay = "";
+  resetBotStrategyPage();
   applyMarketUi();
   refresh();
   refreshBotAlerts("");
@@ -2107,8 +2325,51 @@ function initializeBotControls() {
   $("bot-refresh")?.addEventListener("click", () => refreshBotAlerts());
   $("bot-chat-select")?.addEventListener("change", (event) => {
     botSelectedChatId = event.target.value;
+    botStrategyDay = "";
+    resetBotStrategyPage();
     setText("bot-feedback", "");
     refreshBotAlerts(botSelectedChatId);
+  });
+  $("bot-strategy-direction")?.addEventListener("change", (event) => {
+    botStrategyDirection = event.target.value;
+    resetBotStrategyPage();
+    refreshBotStrategyDashboard();
+  });
+  $("bot-strategy-days")?.addEventListener("change", (event) => {
+    botStrategyDays = Number(event.target.value) || 30;
+    botStrategyDay = "";
+    resetBotStrategyPage();
+    refreshBotStrategyDashboard();
+  });
+  $("bot-strategy-status")?.addEventListener("change", (event) => {
+    botStrategyStatus = event.target.value;
+    resetBotStrategyPage();
+    refreshBotStrategyDashboard();
+  });
+  $("bot-strategy-daily-body")?.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-strategy-day]");
+    if (!row) return;
+    botStrategyDay = row.dataset.strategyDay || "";
+    resetBotStrategyPage();
+    refreshBotStrategyDashboard();
+  });
+  $("bot-strategy-clear-day")?.addEventListener("click", () => {
+    botStrategyDay = "";
+    resetBotStrategyPage();
+    refreshBotStrategyDashboard();
+  });
+  $("bot-strategy-next")?.addEventListener("click", () => {
+    if (!botStrategyNextCursor) return;
+    botStrategyPageHistory.push(botStrategyCursor);
+    botStrategyCursor = botStrategyNextCursor;
+    botStrategyPageNumber += 1;
+    refreshBotStrategyDashboard();
+  });
+  $("bot-strategy-prev")?.addEventListener("click", () => {
+    if (!botStrategyPageHistory.length) return;
+    botStrategyCursor = botStrategyPageHistory.pop() || "";
+    botStrategyPageNumber = Math.max(1, botStrategyPageNumber - 1);
+    refreshBotStrategyDashboard();
   });
 }
 

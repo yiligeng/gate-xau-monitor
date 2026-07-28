@@ -75,14 +75,15 @@ US_MACRO_EVENTS = [
 
 def market_calendar_payload(now: datetime | None = None) -> dict[str, Any]:
     now = (now or datetime.now(SHANGHAI)).astimezone(SHANGHAI)
-    windows = daily_risk_windows(now)
     events = today_event_list(now)
+    windows = daily_risk_windows(now)
     return {
         "timezone": "Asia/Shanghai",
         "date": now.date().isoformat(),
         "generated_at": now.isoformat(),
         "windows": windows,
         "events": events,
+        "event_windows": event_risk_windows(now, events),
         "summary": summary_for_events(events),
     }
 
@@ -157,7 +158,14 @@ def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
             "美国午间深度变薄，突破更容易变成假突破",
         ),
     ]
-    events = today_event_list(now)
+    return sorted(windows, key=lambda item: item["start"])
+
+
+def event_risk_windows(
+    now: datetime,
+    events: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    windows: list[dict[str, Any]] = []
     if any(event["category"] == "fomc" for event in events):
         statement = next(event for event in events if event["category"] == "fomc")
         start = datetime.fromisoformat(statement["time"]) - timedelta(minutes=10)

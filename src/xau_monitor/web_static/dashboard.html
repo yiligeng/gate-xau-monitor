@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=23">
+    <link rel="stylesheet" href="/dashboard.css?v=24">
   </head>
   <body>
     <main class="shell">
@@ -100,16 +100,29 @@
             </div>
           </div>
         </div>
-        <div id="market-calendar" class="market-calendar" aria-label="今日黄金窗口时间">
-          <div class="calendar-head">
-            <div>
-              <span>今日窗口时间</span>
-              <strong id="calendar-summary">正在加载事件日历</strong>
-            </div>
+        <div id="market-calendar" class="market-calendar" aria-label="今日黄金事件与窗口时间">
+          <div class="calendar-date-row">
+            <span>北京时间</span>
             <time id="calendar-date">--</time>
           </div>
-          <div id="calendar-windows" class="calendar-windows"></div>
-          <div id="calendar-events" class="calendar-events"></div>
+          <section class="calendar-section events-section" aria-label="今日重大事件">
+            <div class="calendar-head">
+              <div>
+                <span>重大事件</span>
+                <strong id="calendar-event-summary">正在加载重大事件</strong>
+              </div>
+            </div>
+            <div id="calendar-events" class="calendar-events"></div>
+          </section>
+          <section class="calendar-section windows-section" aria-label="今日窗口时间">
+            <div class="calendar-head">
+              <div>
+                <span>窗口时间</span>
+                <strong id="calendar-window-summary">固定市场节奏，绿色表示震荡窗口</strong>
+              </div>
+            </div>
+            <div id="calendar-windows" class="calendar-windows"></div>
+          </section>
         </div>
         <div class="strategy-bar">
           <div class="strategy-head">
@@ -537,6 +550,6 @@
       <code id="strategy-help-formula"></code>
       <a id="strategy-help-link" class="help-link" href="#" target="_blank" rel="noopener noreferrer" hidden>查看来源</a>
     </div>
-    <script src="/dashboard.js?v=23"></script>
+    <script src="/dashboard.js?v=24"></script>
   </body>
 </html>

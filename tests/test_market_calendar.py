@@ -11,11 +11,19 @@ class MarketCalendarTests(unittest.TestCase):
         )
 
         events = {event["title"]: event for event in payload["events"]}
+        event_windows = {
+            event_window["title"]: event_window
+            for event_window in payload["event_windows"]
+        }
+        windows = {window["title"]: window for window in payload["windows"]}
 
         self.assertIn("FOMC 利率声明", events)
         self.assertIn("FOMC 发布会", events)
+        self.assertIn("FOMC 夜盘", event_windows)
+        self.assertNotIn("FOMC 夜盘", windows)
         self.assertEqual(events["FOMC 利率声明"]["time_label"], "07/30 02:00")
         self.assertEqual(events["FOMC 发布会"]["time_label"], "07/30 02:30")
+        self.assertEqual(event_windows["FOMC 夜盘"]["time_label"], "01:50-03:30")
         self.assertIn("最高影响事件", payload["summary"])
 
     def test_daily_windows_and_nfp_use_beijing_time(self) -> None:

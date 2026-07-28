@@ -306,7 +306,11 @@ function eventToneClass(impact) {
 
 function registerCalendarHelp(kind, item, index) {
   const key = `calendar_${kind}_${index}`;
-  const label = kind === "event" ? "事件" : "窗口";
+  const label = kind === "event"
+    ? "重大事件"
+    : kind === "event_window"
+      ? "事件风险窗"
+      : "窗口时间";
   STRATEGY_HELP[key] = {
     title: item.title || label,
     body: `${item.time_label || "--"}。${item.note || "按北京时间观察价格反应。"}`,
@@ -321,9 +325,48 @@ function renderMarketCalendar(calendar) {
   const container = $("market-calendar");
   if (!container || !calendar) return;
   setText("calendar-date", `${formatCalendarDate(calendar.date)} · 北京时间`);
-  setText("calendar-summary", calendar.summary || "今日窗口时间");
   const windows = Array.isArray(calendar.windows) ? calendar.windows : [];
+  const eventWindows = Array.isArray(calendar.event_windows) ? calendar.event_windows : [];
   const events = Array.isArray(calendar.events) ? calendar.events : [];
+  setText(
+    "calendar-event-summary",
+    eventWindows.length || events.length
+      ? `${calendar.summary || "今日有重大事件。"} 重大事件容易单边，不按震荡窗口处理。`
+      : "今日/今夜暂无重大事件，重点看窗口时间。",
+  );
+  setText(
+    "calendar-window-summary",
+    "固定流动性节奏；绿色=震荡/假突破窗口，红色=高波动窗口。",
+  );
+  const eventWindowCards = eventWindows.map((eventWindow, index) => {
+    const helpKey = registerCalendarHelp("event_window", eventWindow, index);
+    return `
+      <div class="event-chip event-window ${eventToneClass(eventWindow.impact)} ${eventWindow.status}">
+        <div class="calendar-chip-top">
+          <span>${escapeHtml(eventWindow.title)}</span>
+          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(eventWindow.title)}说明">i</button>
+        </div>
+        <strong>${escapeHtml(eventWindow.time_label)}</strong>
+        <span>${escapeHtml(eventWindow.impact)} · 事件风险窗</span>
+      </div>
+    `;
+  }).join("");
+  const eventCards = events.map((event, index) => {
+    const helpKey = registerCalendarHelp("event", event, index);
+    return `
+      <div class="event-chip ${eventToneClass(event.impact)} ${event.status}">
+        <div class="calendar-chip-top">
+          <time>${escapeHtml(event.time_label)}</time>
+          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(event.title)}说明">i</button>
+        </div>
+        <strong>${escapeHtml(event.title)}</strong>
+        <span>${escapeHtml(event.impact)} · ${escapeHtml(event.source)}</span>
+      </div>
+    `;
+  }).join("");
+  $("calendar-events").innerHTML = eventWindowCards || eventCards
+    ? eventWindowCards + eventCards
+    : `<p>今日/今夜暂无重大事件；震荡策略仍以窗口时间和实时形态为准。</p>`;
   $("calendar-windows").innerHTML = windows.map((windowItem, index) => {
     const helpKey = registerCalendarHelp("window", windowItem, index);
     return `
@@ -337,21 +380,6 @@ function renderMarketCalendar(calendar) {
     </div>
   `;
   }).join("");
-  $("calendar-events").innerHTML = events.length
-    ? events.map((event, index) => {
-      const helpKey = registerCalendarHelp("event", event, index);
-      return `
-      <div class="event-chip ${eventToneClass(event.impact)} ${event.status}">
-        <div class="calendar-chip-top">
-          <time>${escapeHtml(event.time_label)}</time>
-          <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(event.title)}说明">i</button>
-        </div>
-        <strong>${escapeHtml(event.title)}</strong>
-        <span>${escapeHtml(event.impact)} · ${escapeHtml(event.source)}</span>
-      </div>
-    `;
-    }).join("")
-    : `<p>今日/今夜暂无最高级美国事件，重点看固定交易时段。</p>`;
 }
 
 function closeStrategyHelp() {

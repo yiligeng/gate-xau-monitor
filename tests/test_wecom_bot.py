@@ -32,6 +32,7 @@ class WeComBotFormatterTests(unittest.TestCase):
     def test_help_mentions_read_only_boundary(self) -> None:
         self.assertIn("只读行情", help_message())
         self.assertIn("今日点位", help_message())
+        self.assertIn("覆盖今日点位", help_message())
 
     def test_formats_market_reply(self) -> None:
         reply = format_market_reply(
@@ -80,6 +81,13 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertIsNotNone(parsed)
         assert parsed is not None
         self.assertEqual(parsed.levels, [4093.67, 4087.7])
+
+    def test_parses_replace_today_level_command(self) -> None:
+        parsed = parse_today_levels_command("黄金 覆盖今日点位 4050.12 4041.88")
+
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual(parsed.levels, [4050.12, 4041.88])
 
     def test_alerts_near_level_then_breaches_after_crossing(self) -> None:
         alert = {

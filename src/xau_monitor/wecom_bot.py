@@ -58,7 +58,8 @@ def help_message() -> str:
             "可用指令：",
             "- 黄金 / XAU：查看 XAUUSD 快照",
             "- BTC：查看 BTCUSDT 永续快照",
-            "- 黄金 今日点位 4093.67 4087.70：设置今天24点前有效的提醒",
+            "- 黄金 今日点位 4093.67 4087.70：覆盖今天旧点位并设置新提醒",
+            "- 黄金 覆盖今日点位 4093.67 4087.70：同上，明确替换今天现有点位",
             "- 黄金 点位：查看今天全部提醒记录（含已触达）",
             "- 黄金 取消今日点位：清空今天的提醒",
             "- 黄金 胜率：查看正负5美元策略的长期统计",
@@ -282,7 +283,7 @@ def _handle_alert_command(
         expires_at = beijing_day_end(datetime.now(SHANGHAI))
         return "\n".join(
             [
-                f"已设置 {market_display_name(market_id)} 今日点位 {len(rows)} 条。",
+                f"已覆盖今天旧点位，并设置 {market_display_name(market_id)} 今日点位 {len(rows)} 条。",
                 f"当前价：{current_price:,.2f}",
                 f"点位：{_format_levels([row['level'] for row in rows])}",
                 f"有效期：北京时间 {expires_at:%m-%d %H:%M}",

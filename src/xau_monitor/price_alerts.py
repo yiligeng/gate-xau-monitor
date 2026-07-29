@@ -40,6 +40,23 @@ class ParsedLevelCommand:
 
 
 @dataclass(frozen=True)
+class ParsedLevelRangeCommand:
+    values: list[float]
+
+    @property
+    def has_range(self) -> bool:
+        return len(self.values) >= 2
+
+    @property
+    def lower(self) -> float:
+        return min(self.values[:2])
+
+    @property
+    def upper(self) -> float:
+        return max(self.values[:2])
+
+
+@dataclass(frozen=True)
 class AlertNotification:
     id: int
     chat_id: str
@@ -203,6 +220,50 @@ class PriceAlertStore:
                 SELECT count(*) FROM cancelled
                 """,
                 (now, chat_id, market, now, now, now),
+            ).fetchone()
+            return int(result[0]) if result else 0
+
+    def mark_today_alerts_breached(
+        self,
+        chat_id: str,
+        market: str,
+        lower: float,
+        upper: float,
+        now: datetime | None = None,
+    ) -> int:
+        now = now or utc_now()
+        lower, upper = sorted((lower, upper))
+        with self._connect() as connection:
+            result = connection.execute(
+                """
+                WITH marked AS (
+                    UPDATE app.price_alerts
+                    SET status = 'breached',
+                        alerts_sent = alert_limit,
+                        last_alert_at = %s,
+                        breached_at = COALESCE(breached_at, %s),
+                        updated_at = %s
+                    WHERE chat_id = %s
+                      AND market = %s
+                      AND status = 'active'
+                      AND expires_at > %s
+                      AND level >= %s
+                      AND level <= %s
+                    RETURNING id
+                ),
+                closed_trials AS (
+                    UPDATE app.point_strategy_trials AS trial
+                    SET status = 'cancelled',
+                        resolved_at = %s,
+                        updated_at = %s
+                    FROM marked
+                    WHERE trial.price_alert_id = marked.id
+                      AND trial.status = 'pending'
+                    RETURNING trial.id
+                )
+                SELECT count(*) FROM marked
+                """,
+                (now, now, now, chat_id, market, now, lower, upper, now, now),
             ).fetchone()
             return int(result[0]) if result else 0
 
@@ -1426,6 +1487,19 @@ def parse_today_levels_command(text: str) -> ParsedLevelCommand | None:
         if value > 0:
             levels.append(value)
     return ParsedLevelCommand(levels=dedupe_levels(levels))
+
+
+def parse_mark_touched_levels_command(text: str) -> ParsedLevelRangeCommand | None:
+    if "标记触达点位" not in text:
+        return None
+    tail = text.split("标记触达点位", 1)[1]
+    matches = re.findall(r"(?<![\w.])-?\d+(?:,\d{3})*(?:\.\d+)?", tail)
+    values = []
+    for match in matches:
+        value = float(match.replace(",", ""))
+        if value > 0:
+            values.append(value)
+    return ParsedLevelRangeCommand(values=dedupe_levels(values))
 
 
 def dedupe_levels(levels: list[float]) -> list[float]:

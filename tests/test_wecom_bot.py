@@ -10,6 +10,7 @@ from xau_monitor.price_alerts import (
     normalize_setup_day,
     normalize_strategy_direction,
     normalize_strategy_status,
+    parse_mark_touched_levels_command,
     parse_today_levels_command,
     should_alert,
     strategy_status_for_candle,
@@ -33,6 +34,7 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertIn("只读行情", help_message())
         self.assertIn("今日点位", help_message())
         self.assertIn("覆盖今日点位", help_message())
+        self.assertIn("标记触达点位", help_message())
 
     def test_formats_market_reply(self) -> None:
         reply = format_market_reply(
@@ -88,6 +90,17 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertIsNotNone(parsed)
         assert parsed is not None
         self.assertEqual(parsed.levels, [4050.12, 4041.88])
+
+    def test_parses_mark_touched_level_range_command(self) -> None:
+        parsed = parse_mark_touched_levels_command(
+            "黄金 标记触达点位 区间 4,050.12 到 4,041.88"
+        )
+
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertTrue(parsed.has_range)
+        self.assertEqual(parsed.lower, 4041.88)
+        self.assertEqual(parsed.upper, 4050.12)
 
     def test_alerts_near_level_then_breaches_after_crossing(self) -> None:
         alert = {

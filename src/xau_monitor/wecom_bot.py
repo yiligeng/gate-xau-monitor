@@ -12,6 +12,7 @@ from .price_alerts import (
     AlertNotification,
     PriceAlertStore,
     beijing_day_end,
+    parse_mark_touched_levels_command,
     parse_today_levels_command,
 )
 
@@ -60,6 +61,7 @@ def help_message() -> str:
             "- BTC：查看 BTCUSDT 永续快照",
             "- 黄金 今日点位 4093.67 4087.70：覆盖今天旧点位并设置新提醒",
             "- 黄金 覆盖今日点位 4093.67 4087.70：同上，明确替换今天现有点位",
+            "- 黄金 标记触达点位 4040-4050：区间内今天点位改为已触达，不再告警",
             "- 黄金 点位：查看今天全部提醒记录（含已触达）",
             "- 黄金 取消今日点位：清空今天的提醒",
             "- 黄金 胜率：查看正负5美元策略的长期统计",
@@ -259,6 +261,32 @@ def _handle_alert_command(
             return "没有拿到当前会话ID，暂时不能保存或取消点位。"
         count = alert_store.cancel_today_alerts(chat_id, market_id)
         return f"已取消 {market_display_name(market_id)} 今日点位 {count} 条。"
+
+    touched_range = parse_mark_touched_levels_command(text)
+    if touched_range is not None:
+        if not touched_range.has_range:
+            return (
+                "我看到了“标记触达点位”，但没识别到完整区间。"
+                "格式：黄金 标记触达点位 4040-4050"
+            )
+        if alert_store is None:
+            return "点位提醒需要数据库配置，目前只能查询行情。"
+        chat_id = extract_chat_id(frame)
+        if not chat_id:
+            return "没有拿到当前会话ID，暂时不能标记点位。"
+        count = alert_store.mark_today_alerts_breached(
+            chat_id=chat_id,
+            market=market_id,
+            lower=touched_range.lower,
+            upper=touched_range.upper,
+        )
+        return "\n".join(
+            [
+                f"已标记 {market_display_name(market_id)} 今日触达点位 {count} 条。",
+                f"区间：{touched_range.lower:,.2f}-{touched_range.upper:,.2f}（两端包含）",
+                "结果：区间内仍在监控的点位已作废，不会再告警。",
+            ]
+        )
 
     parsed = parse_today_levels_command(text)
     if parsed is not None:

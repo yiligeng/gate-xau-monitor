@@ -80,6 +80,28 @@ class GateTradFiClient:
 
         raise GateAPIError(f"请求 Gate 行情失败：{last_error}") from last_error
 
+    def _get_public(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        url = f"{self.base_url}{path}"
+        if params:
+            url = f"{url}?{urlencode(params)}"
+        request = Request(
+            url,
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "gate-xau-monitor/0.1",
+            },
+        )
+        last_error: Exception | None = None
+        for attempt in range(self.retries + 1):
+            try:
+                with urlopen(request, timeout=self.timeout) as response:
+                    return json.load(response)
+            except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+                last_error = exc
+                if attempt < self.retries:
+                    time.sleep(0.4 * (2**attempt))
+        raise GateAPIError(f"请求 Gate 公共行情失败：{last_error}") from last_error
+
     def ticker(self, symbol: str = "XAUUSD") -> Ticker:
         payload = self._get(f"/tradfi/symbols/{symbol}/tickers")
         return ticker_from_payload(payload)
@@ -109,6 +131,112 @@ class GateTradFiClient:
         if len(candles) < 55:
             raise GateAPIError(f"{interval} K线数量不足：仅返回 {len(candles)} 根")
         return candles
+
+    def volume_proxy(self, symbol: str = "XAUUSD") -> dict[str, Any]:
+        pairs = ("XAUT_USDT", "PAXG_USDT")
+        markets: list[dict[str, Any]] = []
+        for pair in pairs:
+            try:
+                market = self._spot_volume_market(pair)
+            except Exception:
+                continue
+            markets.append(market)
+        if not markets:
+            raise GateAPIError(f"{symbol} 黄金代理成交量缺失")
+        markets.sort(
+            key=lambda item: (
+                item["trade_count_60s"],
+                item["buy_quote_60s"] + item["sell_quote_60s"],
+                item["current_quote"],
+            ),
+            reverse=True,
+        )
+        rvol = markets[0]["rvol"]
+        status = "放量" if rvol >= 1.5 else "缩量" if 0 < rvol < 0.65 else "常态"
+        return {
+            "source": "Gate XAUT/PAXG 现货代理",
+            "methodology": "XAUT_USDT 与 PAXG_USDT 现货成交量代理黄金活跃度，非 COMEX 成交量",
+            "active_symbol": markets[0]["symbol"],
+            "status": status,
+            "markets": markets,
+        }
+
+    def _spot_volume_market(self, pair: str) -> dict[str, Any]:
+        raw_candles = self._get_public(
+            "/spot/candlesticks",
+            {"currency_pair": pair, "interval": "1m", "limit": 22},
+        )
+        raw_trades = self._get_public(
+            "/spot/trades",
+            {"currency_pair": pair, "limit": 1000},
+        )
+        if not isinstance(raw_candles, list) or not raw_candles:
+            raise GateAPIError(f"{pair} 现货成交量缺失")
+
+        volume_candles: list[dict[str, float]] = []
+        for row in raw_candles:
+            timestamp = float(row[0])
+            quote = float(row[1])
+            close = float(row[2])
+            base = float(row[6]) if len(row) > 6 else quote / close
+            volume_candles.append(
+                {
+                    "timestamp": timestamp,
+                    "base": base,
+                    "quote": quote,
+                }
+            )
+        volume_candles.sort(key=lambda item: item["timestamp"])
+        latest = volume_candles[-1]
+        baseline_rows = [item["quote"] for item in volume_candles[-21:-1]]
+        baseline = statistics.median(baseline_rows) if baseline_rows else 0.0
+        elapsed = max(5.0, min(60.0, time.time() - latest["timestamp"]))
+        projected = latest["quote"] * (60.0 / elapsed)
+
+        trades: list[dict[str, float | str]] = []
+        if isinstance(raw_trades, list):
+            cutoff_ms = time.time() * 1000.0 - 60_000.0
+            for row in raw_trades:
+                timestamp_ms = spot_trade_timestamp_ms(row)
+                if timestamp_ms < cutoff_ms:
+                    continue
+                amount = abs(float(row["amount"]))
+                price = float(row["price"])
+                trades.append(
+                    {
+                        "timestamp_ms": timestamp_ms,
+                        "side": str(row.get("side", "")),
+                        "quote": amount * price,
+                    }
+                )
+        buy_quote = sum(item["quote"] for item in trades if item["side"] == "buy")
+        sell_quote = sum(item["quote"] for item in trades if item["side"] == "sell")
+        traded_quote = buy_quote + sell_quote
+        newest_trade = max(
+            (float(item["timestamp_ms"]) for item in trades),
+            default=0.0,
+        )
+        return {
+            "symbol": pair,
+            "current_base": latest["base"],
+            "current_quote": latest["quote"],
+            "projected_quote": projected,
+            "baseline_quote": baseline,
+            "rvol": projected / baseline if baseline > 0 else 0.0,
+            "buy_quote_60s": buy_quote,
+            "sell_quote_60s": sell_quote,
+            "delta_percent": (
+                (buy_quote - sell_quote) / traded_quote * 100.0
+                if traded_quote > 0
+                else 0.0
+            ),
+            "trade_count_60s": len(trades),
+            "freshness_ms": (
+                max(0.0, time.time() * 1000.0 - newest_trade)
+                if newest_trade > 0
+                else None
+            ),
+        }
 
 
 class GateFuturesClient:
@@ -314,6 +442,14 @@ def ticker_from_payload(payload: dict[str, Any]) -> Ticker:
         change_percent=float(data["price_change"]),
         status=str(data["status"]),
     )
+
+
+def spot_trade_timestamp_ms(row: dict[str, Any]) -> float:
+    raw = row.get("create_time_ms")
+    if raw is not None:
+        value = float(raw)
+        return value if value > 1_000_000_000_000 else value * 1000.0
+    return float(row["create_time"]) * 1000.0
 
 
 class GateTradFiTickerConnection:

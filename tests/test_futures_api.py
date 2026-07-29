@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from xau_monitor.api import GateFuturesClient
+from xau_monitor.api import GateFuturesClient, GateTradFiClient
 
 
 class StubFuturesClient(GateFuturesClient):
@@ -35,6 +35,43 @@ class StubFuturesClient(GateFuturesClient):
         raise AssertionError(path)
 
 
+class StubTradFiClient(GateTradFiClient):
+    def _get_public(self, path, params=None):
+        pair = params["currency_pair"]
+        if path.endswith("candlesticks"):
+            return [
+                [
+                    str(1_000 + index * 60),
+                    str(1_000 + index * 10),
+                    "4000",
+                    "4001",
+                    "3999",
+                    "4000",
+                    "0.25",
+                    "true",
+                ]
+                for index in range(22)
+            ]
+        if path.endswith("trades") and pair == "XAUT_USDT":
+            return [
+                {
+                    "create_time_ms": "2259.500",
+                    "side": "buy",
+                    "amount": "0.01",
+                    "price": "4000",
+                },
+                {
+                    "create_time_ms": "2259.800",
+                    "side": "sell",
+                    "amount": "0.005",
+                    "price": "4000",
+                },
+            ]
+        if path.endswith("trades"):
+            return []
+        raise AssertionError(path)
+
+
 class FuturesVolumeTests(unittest.TestCase):
     @patch("xau_monitor.api.time.time", return_value=2260.0)
     def test_builds_real_perpetual_volume_and_trade_delta(self, _time) -> None:
@@ -45,6 +82,21 @@ class FuturesVolumeTests(unittest.TestCase):
         self.assertEqual(market["trade_count_60s"], 2)
         self.assertAlmostEqual(market["buy_quote_60s"], 50)
         self.assertAlmostEqual(market["sell_quote_60s"], 25)
+        self.assertAlmostEqual(market["delta_percent"], 100 / 3)
+        self.assertAlmostEqual(market["freshness_ms"], 200)
+
+
+class TradFiVolumeProxyTests(unittest.TestCase):
+    @patch("xau_monitor.api.time.time", return_value=2260.0)
+    def test_builds_gold_spot_proxy_volume(self, _time) -> None:
+        proxy = StubTradFiClient().volume_proxy("XAUUSD")
+        market = proxy["markets"][0]
+
+        self.assertEqual(proxy["active_symbol"], "XAUT_USDT")
+        self.assertEqual(market["symbol"], "XAUT_USDT")
+        self.assertEqual(market["trade_count_60s"], 2)
+        self.assertAlmostEqual(market["buy_quote_60s"], 40)
+        self.assertAlmostEqual(market["sell_quote_60s"], 20)
         self.assertAlmostEqual(market["delta_percent"], 100 / 3)
         self.assertAlmostEqual(market["freshness_ms"], 200)
 

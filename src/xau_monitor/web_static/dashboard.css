@@ -668,7 +668,9 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .chart-empty { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); font-size: 13px; pointer-events: none; }
 
 .scalp-card { margin-top: 16px; padding: 24px; }
-.scalp-heading { align-items: flex-start; }
+.scalp-heading { align-items: center; gap: 12px; }
+.scalp-content { margin-top: 14px; }
+.scalp-content[hidden] { display: none; }
 .title-with-help,
 .label-with-help,
 .field-label,
@@ -884,6 +886,37 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
 .scalp-state.long, .scalp-state.armed_long { border-color: rgba(46,203,145,.35); color: var(--green); }
 .scalp-state.short, .scalp-state.armed_short { border-color: rgba(255,89,109,.35); color: var(--red); }
 .scalp-state.avoid { color: #a5adaf; }
+.scalp-toggle {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 8px 11px;
+  background: rgba(255,255,255,.025);
+  color: var(--muted);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+  cursor: pointer;
+}
+.scalp-toggle:hover,
+.scalp-toggle:focus-visible {
+  border-color: rgba(233,185,73,.42);
+  outline: 0;
+  color: var(--gold);
+}
+.scalp-toggle i {
+  width: 7px;
+  height: 7px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  transition: transform .16s ease;
+}
+.scalp-toggle[aria-expanded="true"] i {
+  transform: rotate(225deg) translateY(-1px);
+}
 .scalp-layout { display: grid; grid-template-columns: 1.35fr .65fr; gap: 14px; }
 .scalp-signal, .scalp-checks {
   min-width: 0;
@@ -1637,9 +1670,10 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   .bot-detail-controls select { flex: 1; }
   .bot-trial { grid-template-columns: repeat(2, 1fr); }
   .scalp-card { padding: 18px; }
-  .scalp-heading { gap: 12px; }
+  .scalp-heading { align-items: flex-start; gap: 12px; }
   .scalp-state { flex-direction: column; align-items: flex-end; gap: 3px; border: 0; padding: 0; }
   .scalp-state strong { padding: 3px 6px; }
+  .scalp-toggle { margin-left: auto; padding: 7px 10px; }
   .trade-levels { grid-template-columns: repeat(2, 1fr); }
   .risk-calculator { grid-template-columns: repeat(2, 1fr); }
   .journal-stats { grid-template-columns: repeat(2, 1fr); }

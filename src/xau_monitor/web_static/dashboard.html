@@ -204,100 +204,111 @@
               <button class="info-button" type="button" data-help-key="score" aria-label="查看评分公式">i</button>
             </span>
           </div>
+          <button
+            id="scalp-toggle"
+            class="scalp-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="scalp-content"
+          >
+            <span id="scalp-toggle-label">展开</span>
+            <i aria-hidden="true"></i>
+          </button>
         </div>
 
-        <div class="strategy-explainer">
-          <div class="strategy-summary">
-            <span>一句话</span>
-            <strong>顺着5/15分钟方向，等价格在关键位“假突破后收回”，确认后入场；错了小止损，对了拿1.5倍。</strong>
-          </div>
-          <div class="direction-readable">
-            <div class="direction-readable-head">
-              <div>
-                <span>TREND BACKGROUND · 这里只判断趋势背景，不代表入场</span>
-                <strong id="direction-readable-title">正在计算四项方向条件</strong>
-              </div>
-              <button class="info-button" type="button" data-help-key="direction_terms" aria-label="查看方向判断名词解释">i</button>
+        <div id="scalp-content" class="scalp-content" hidden>
+          <div class="strategy-explainer">
+            <div class="strategy-summary">
+              <span>一句话</span>
+              <strong>顺着5/15分钟方向，等价格在关键位“假突破后收回”，确认后入场；错了小止损，对了拿1.5倍。</strong>
             </div>
-            <p id="direction-persistence" class="direction-persistence">
-              趋势背景与当前动作是两件事：背景选方向，入场还要继续通过下面的闸门。
-            </p>
-            <div id="direction-readable-checks" class="direction-readable-checks">
-              <p>等待5分钟和15分钟K线数据…</p>
-            </div>
-            <p class="direction-logic-summary">
-              四项不是重复判断：第1项看现在的位置，第2项看整体趋势排列，第3项看趋势是否仍在延续，第4项防止逆着更大的15分钟方向。缺一项就先观望。
-            </p>
-          </div>
-          <div class="strategy-flow" aria-label="策略执行流程">
-            <div><b>1</b><span>先定方向</span><small>不猜多空</small></div>
-            <i>→</i>
-            <div><b>2</b><span>等到关键位</span><small>不在中间追</small></div>
-            <i>→</i>
-            <div><b>3</b><span>等假突破收回</span><small>1分钟确认</small></div>
-            <i>→</i>
-            <div><b>4</b><span>核对成本空间</span><small>点差与止损</small></div>
-            <i>→</i>
-            <div><b>5</b><span>量能只加分</span><small>不能单独开仓</small></div>
-            <i>→</i>
-            <div><b>6</b><span>达到80分</span><small>才可能触发</small></div>
-          </div>
-          <p><strong>红点</strong>＝条件未完成，继续等；<strong>黄点</strong>＝辅助条件中性；<strong>绿点</strong>＝该项通过。评分是规则完成度，不是胜率。</p>
-        </div>
-
-        <div class="scalp-layout">
-          <div class="scalp-signal">
-            <div class="signal-direction">
-              <span class="label-with-help">当前动作<button class="info-button" type="button" data-help-key="action" aria-label="查看动作状态说明">i</button></span>
-              <strong id="scalp-action">等待行情</strong>
-              <p id="scalp-message">系统只在完整条件同时满足时给出做多或做空信号。</p>
-            </div>
-            <div class="trade-levels">
-              <div><span class="label-with-help">触发入场<button class="info-button" type="button" data-help-key="entry" aria-label="查看入场公式">i</button></span><strong id="scalp-entry">--</strong></div>
-              <div><span class="label-with-help">硬止损<button class="info-button" type="button" data-help-key="stop" aria-label="查看止损公式">i</button></span><strong id="scalp-stop">--</strong></div>
-              <div><span class="label-with-help">固定止盈<button class="info-button" type="button" data-help-key="target" aria-label="查看止盈公式">i</button></span><strong id="scalp-target">--</strong></div>
-              <div><span class="label-with-help">盈亏比 / 时限<button class="info-button" type="button" data-help-key="rr" aria-label="查看盈亏比和时限说明">i</button></span><strong id="scalp-rr">1.5R · 8分钟</strong></div>
-            </div>
-            <div class="risk-calculator">
-              <div>
-                <div class="field-label"><label for="risk-balance">账户资金</label><button class="info-button" type="button" data-help-key="balance" aria-label="查看账户资金说明">i</button></div>
-                <input id="risk-balance" type="number" inputmode="decimal" min="1" step="10" value="500">
+            <div class="direction-readable">
+              <div class="direction-readable-head">
+                <div>
+                  <span>TREND BACKGROUND · 这里只判断趋势背景，不代表入场</span>
+                  <strong id="direction-readable-title">正在计算四项方向条件</strong>
+                </div>
+                <button class="info-button" type="button" data-help-key="direction_terms" aria-label="查看方向判断名词解释">i</button>
               </div>
-              <div>
-                <div class="field-label"><label for="risk-percent">单笔风险%</label><button class="info-button" type="button" data-help-key="risk" aria-label="查看单笔风险公式">i</button></div>
-                <input id="risk-percent" type="number" inputmode="decimal" min="0.05" max="2" step="0.05" value="0.25">
+              <p id="direction-persistence" class="direction-persistence">
+                趋势背景与当前动作是两件事：背景选方向，入场还要继续通过下面的闸门。
+              </p>
+              <div id="direction-readable-checks" class="direction-readable-checks">
+                <p>等待5分钟和15分钟K线数据…</p>
               </div>
-              <div>
-                <div class="field-label"><label id="contract-size-label" for="contract-ounces">每标准手盎司</label><button class="info-button" type="button" data-help-key="contract" aria-label="查看合约单位说明">i</button></div>
-                <input id="contract-ounces" type="number" inputmode="decimal" min="1" step="1" value="100">
-              </div>
-              <div class="risk-output">
-                <span class="label-with-help"><span id="position-unit-label">参考手数</span><button class="info-button" type="button" data-help-key="position" aria-label="查看仓位公式">i</button></span>
-                <strong id="risk-lots">--</strong>
-                <small id="risk-usd">风险 --</small>
-              </div>
+              <p class="direction-logic-summary">
+                四项不是重复判断：第1项看现在的位置，第2项看整体趋势排列，第3项看趋势是否仍在延续，第4项防止逆着更大的15分钟方向。缺一项就先观望。
+              </p>
             </div>
-            <p id="risk-note" class="risk-note">下单前必须核对你的交易平台合约规格与最小手数；禁止补仓、扛单和马丁。</p>
+            <div class="strategy-flow" aria-label="策略执行流程">
+              <div><b>1</b><span>先定方向</span><small>不猜多空</small></div>
+              <i>→</i>
+              <div><b>2</b><span>等到关键位</span><small>不在中间追</small></div>
+              <i>→</i>
+              <div><b>3</b><span>等假突破收回</span><small>1分钟确认</small></div>
+              <i>→</i>
+              <div><b>4</b><span>核对成本空间</span><small>点差与止损</small></div>
+              <i>→</i>
+              <div><b>5</b><span>量能只加分</span><small>不能单独开仓</small></div>
+              <i>→</i>
+              <div><b>6</b><span>达到80分</span><small>才可能触发</small></div>
+            </div>
+            <p><strong>红点</strong>＝条件未完成，继续等；<strong>黄点</strong>＝辅助条件中性；<strong>绿点</strong>＝该项通过。评分是规则完成度，不是胜率。</p>
           </div>
 
-          <div class="scalp-checks">
-            <div class="title-with-help">
-              <h3>入场闸门</h3>
-              <button class="info-button" type="button" data-help-key="gates" aria-label="查看入场闸门说明">i</button>
+          <div class="scalp-layout">
+            <div class="scalp-signal">
+              <div class="signal-direction">
+                <span class="label-with-help">当前动作<button class="info-button" type="button" data-help-key="action" aria-label="查看动作状态说明">i</button></span>
+                <strong id="scalp-action">等待行情</strong>
+                <p id="scalp-message">系统只在完整条件同时满足时给出做多或做空信号。</p>
+              </div>
+              <div class="trade-levels">
+                <div><span class="label-with-help">触发入场<button class="info-button" type="button" data-help-key="entry" aria-label="查看入场公式">i</button></span><strong id="scalp-entry">--</strong></div>
+                <div><span class="label-with-help">硬止损<button class="info-button" type="button" data-help-key="stop" aria-label="查看止损公式">i</button></span><strong id="scalp-stop">--</strong></div>
+                <div><span class="label-with-help">固定止盈<button class="info-button" type="button" data-help-key="target" aria-label="查看止盈公式">i</button></span><strong id="scalp-target">--</strong></div>
+                <div><span class="label-with-help">盈亏比 / 时限<button class="info-button" type="button" data-help-key="rr" aria-label="查看盈亏比和时限说明">i</button></span><strong id="scalp-rr">1.5R · 8分钟</strong></div>
+              </div>
+              <div class="risk-calculator">
+                <div>
+                  <div class="field-label"><label for="risk-balance">账户资金</label><button class="info-button" type="button" data-help-key="balance" aria-label="查看账户资金说明">i</button></div>
+                  <input id="risk-balance" type="number" inputmode="decimal" min="1" step="10" value="500">
+                </div>
+                <div>
+                  <div class="field-label"><label for="risk-percent">单笔风险%</label><button class="info-button" type="button" data-help-key="risk" aria-label="查看单笔风险公式">i</button></div>
+                  <input id="risk-percent" type="number" inputmode="decimal" min="0.05" max="2" step="0.05" value="0.25">
+                </div>
+                <div>
+                  <div class="field-label"><label id="contract-size-label" for="contract-ounces">每标准手盎司</label><button class="info-button" type="button" data-help-key="contract" aria-label="查看合约单位说明">i</button></div>
+                  <input id="contract-ounces" type="number" inputmode="decimal" min="1" step="1" value="100">
+                </div>
+                <div class="risk-output">
+                  <span class="label-with-help"><span id="position-unit-label">参考手数</span><button class="info-button" type="button" data-help-key="position" aria-label="查看仓位公式">i</button></span>
+                  <strong id="risk-lots">--</strong>
+                  <small id="risk-usd">风险 --</small>
+                </div>
+              </div>
+              <p id="risk-note" class="risk-note">下单前必须核对你的交易平台合约规格与最小手数；禁止补仓、扛单和马丁。</p>
             </div>
-            <div id="scalp-checklist" class="checklist">
-              <div><i></i><span>正在计算多周期趋势</span></div>
-            </div>
-            <div class="zone-readout">
-              <span class="label-with-help">当前观察区域<button class="info-button" type="button" data-help-key="zone" aria-label="查看关键区域公式">i</button></span>
-              <strong id="scalp-zone">--</strong>
-              <small id="scalp-zone-detail">至少两个周期或枢轴重合才有效</small>
-            </div>
-            <p class="event-warning">重要数据（非农、CPI、FOMC）公布前后10分钟暂停交易；当前免费版不自动读取财经日历。</p>
-          </div>
-        </div>
 
-        <div class="paper-journal">
+            <div class="scalp-checks">
+              <div class="title-with-help">
+                <h3>入场闸门</h3>
+                <button class="info-button" type="button" data-help-key="gates" aria-label="查看入场闸门说明">i</button>
+              </div>
+              <div id="scalp-checklist" class="checklist">
+                <div><i></i><span>正在计算多周期趋势</span></div>
+              </div>
+              <div class="zone-readout">
+                <span class="label-with-help">当前观察区域<button class="info-button" type="button" data-help-key="zone" aria-label="查看关键区域公式">i</button></span>
+                <strong id="scalp-zone">--</strong>
+                <small id="scalp-zone-detail">至少两个周期或枢轴重合才有效</small>
+              </div>
+              <p class="event-warning">重要数据（非农、CPI、FOMC）公布前后10分钟暂停交易；当前免费版不自动读取财经日历。</p>
+            </div>
+          </div>
+
+          <div class="paper-journal">
           <div class="journal-head">
             <div>
               <span>本机模拟验证</span>
@@ -317,6 +328,7 @@
           <div id="journal-list" class="journal-list">
             <p>暂无模拟交易。保持页面打开，触发后将按买卖价、止损、1.5R止盈和8分钟时限自动记录。</p>
           </div>
+        </div>
         </div>
       </section>
 

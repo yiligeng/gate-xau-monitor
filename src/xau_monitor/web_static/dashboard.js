@@ -173,13 +173,13 @@ const STRATEGY_HELP = {
   },
   keylevels: {
     title: "这三个关键位从哪里来？",
-    body: "这一块是图表的快速定位尺：当前价格来自最新报价；近端阻力和支撑取最近20根已经收盘的1分钟K线最高点与最低点。它反映最近约20分钟的可见边界，不等于下面策略使用的多周期聚类区域。",
-    formula: "近端阻力 = max(最近20根已收盘1分钟K线的最高价)；近端支撑 = min(最近20根的最低价)",
+    body: "这一块优先使用当前企业微信群会话今天仍在监控中的点位；已触达、取消和过期点位都会排除。没有可用机器人点位时，才回退到1分钟K线的短线边界。",
+    formula: "近端阻力 = min(监控中点位中高于当前价的点位)；近端支撑 = max(监控中点位中低于当前价的点位)",
   },
   near_resistance: {
     title: "近端阻力算法",
-    body: "取最近20根已经收盘的1分钟K线，找其中最高的最高价。价格靠近这里时，代表正在接近最近约20分钟内尚未突破的上边界。",
-    formula: "Resistance₁ₘ = max(High[t−20 … t−1])",
+    body: "优先在当前会话今天仍处于“监控中”的点位里，找高于当前价且距离最近的一个。已触达点位不再参与阻力计算。",
+    formula: "Resistance = min(level > 当前价 且 status=active)",
   },
   current_price: {
     title: "当前价格来源",
@@ -188,8 +188,8 @@ const STRATEGY_HELP = {
   },
   near_support: {
     title: "近端支撑算法",
-    body: "取最近20根已经收盘的1分钟K线，找其中最低的最低价。价格靠近这里时，代表正在接近最近约20分钟内曾出现承接的下边界。",
-    formula: "Support₁ₘ = min(Low[t−20 … t−1])",
+    body: "优先在当前会话今天仍处于“监控中”的点位里，找低于当前价且距离最近的一个。已触达点位不再参与支撑计算。",
+    formula: "Support = max(level < 当前价 且 status=active)",
   },
   live_notes: {
     title: "当前提示怎么生成？",
@@ -198,8 +198,8 @@ const STRATEGY_HELP = {
   },
   structure_note: {
     title: "第一条：结构提示",
-    body: "先比较当前价格与1分钟EMA20，再要求5分钟方向一致。两者同空就提示关注跌破支撑；两者同多就提示关注突破阻力；否则提示继续观察区间。",
-    formula: "空：价格<EMA20₁ₘ 且 5分钟偏空；多：价格>EMA20₁ₘ 且 5分钟偏多；其余=震荡",
+    body: "如果当前会话有仍在监控中的点位，第一条提示会先展示最近的上方/下方监控位区间；已触达点位不参与。没有机器人点位时，才展示原来的EMA与K线结构提示。",
+    formula: "监控区间 = 最近下方active点位 – 最近上方active点位",
   },
   atr_note: {
     title: "第二条：ATR与点差",
@@ -233,6 +233,11 @@ let botStrategyNextCursor = "";
 let botStrategyPageHistory = [];
 let botStrategyPageNumber = 1;
 let botStrategyRequestSequence = 0;
+let botKeyLevelContext = {
+  market: "",
+  chatId: "",
+  activeAlerts: [],
+};
 const clientTicks = [];
 let paperTrades = loadPaperTrades();
 const defaultIndicators = {
@@ -276,6 +281,126 @@ function toneForBias(bias) {
 function setText(id, value) {
   const node = $(id);
   if (node) node.textContent = value;
+}
+
+function setScalpExpanded(expanded) {
+  const content = $("scalp-content");
+  const toggle = $("scalp-toggle");
+  if (!content || !toggle) return;
+  content.hidden = !expanded;
+  toggle.setAttribute("aria-expanded", expanded ? "true" : "false");
+  setText("scalp-toggle-label", expanded ? "收起" : "展开");
+}
+
+function activeBotLevelsFor(data) {
+  if (
+    !botKeyLevelContext.chatId
+    || botKeyLevelContext.market !== activeMarket
+    || data?.market?.id !== activeMarket
+  ) {
+    return [];
+  }
+  return botKeyLevelContext.activeAlerts
+    .filter((alert) => alert?.status === "active")
+    .map((alert) => Number(alert.level))
+    .filter(Number.isFinite);
+}
+
+function displayKeyLevels(data) {
+  const price = Number(data?.ticker?.last);
+  const activeLevels = activeBotLevelsFor(data);
+  const fallbackSupport = Number(data?.frames?.["1m"]?.support);
+  const fallbackResistance = Number(data?.frames?.["1m"]?.resistance);
+  if (!Number.isFinite(price) || !activeLevels.length) {
+    return {
+      source: "candles",
+      support: Number.isFinite(fallbackSupport) ? fallbackSupport : null,
+      resistance: Number.isFinite(fallbackResistance) ? fallbackResistance : null,
+    };
+  }
+  const below = activeLevels.filter((level) => level < price);
+  const above = activeLevels.filter((level) => level > price);
+  return {
+    source: "bot",
+    support: below.length ? Math.max(...below) : null,
+    resistance: above.length ? Math.min(...above) : null,
+  };
+}
+
+function displayPlan(data) {
+  const levels = displayKeyLevels(data);
+  const basePlan = Array.isArray(data?.plan) ? data.plan : [];
+  if (levels.source !== "bot") return basePlan;
+  const notes = [];
+  if (Number.isFinite(levels.support) && Number.isFinite(levels.resistance)) {
+    notes.push(
+      `只看监控中点位；观察 ${priceFormat.format(levels.support)}–${priceFormat.format(levels.resistance)} 区间突破`,
+    );
+  } else if (Number.isFinite(levels.support)) {
+    notes.push(
+      `只看监控中点位；最近下方支撑 ${priceFormat.format(levels.support)}，上方暂无未触达监控位`,
+    );
+  } else if (Number.isFinite(levels.resistance)) {
+    notes.push(
+      `只看监控中点位；最近上方阻力 ${priceFormat.format(levels.resistance)}，下方暂无未触达监控位`,
+    );
+  } else {
+    notes.push("当前会话没有位于现价上下的监控中点位；已触达点位不再参与关键位");
+  }
+  return [...notes, ...basePlan.slice(1)];
+}
+
+function levelZone(center, data) {
+  const value = Number(center);
+  if (!Number.isFinite(value)) return null;
+  const atr1 = Number(data?.frames?.["1m"]?.atr14);
+  const spread = Number(data?.ticker?.spread);
+  const halfWidth = Math.max(
+    Number.isFinite(atr1) ? atr1 * 0.08 : 0,
+    Number.isFinite(spread) ? spread * 1.5 : 0,
+    0.06,
+  );
+  return {
+    center: value,
+    lower: value - halfWidth,
+    upper: value + halfWidth,
+  };
+}
+
+function renderKeyLevelViews(data) {
+  const levels = displayKeyLevels(data);
+  const ticker = data?.ticker;
+  const plan = displayPlan(data);
+  setText(
+    "resistance",
+    Number.isFinite(levels.resistance)
+      ? priceFormat.format(levels.resistance)
+      : "--",
+  );
+  setText(
+    "level-current",
+    Number.isFinite(Number(ticker?.last))
+      ? priceFormat.format(ticker.last)
+      : "--",
+  );
+  setText(
+    "support",
+    Number.isFinite(levels.support)
+      ? priceFormat.format(levels.support)
+      : "--",
+  );
+  setText("alert-line", plan[0] || "等待新的结构提示");
+  const planHelpKeys = ["structure_note", "atr_note", "volume_note_help"];
+  $("plan-list").innerHTML = plan.map((item, index) => `
+    <li>
+      <span>${escapeHtml(item)}</span>
+      <button
+        class="info-button"
+        type="button"
+        data-help-key="${planHelpKeys[index] || "live_notes"}"
+        aria-label="查看这条提示的算法"
+      >i</button>
+    </li>`).join("");
 }
 
 function escapeHtml(value) {
@@ -1050,6 +1175,11 @@ function renderBotAlerts(data) {
   setText("bot-current-price", priceFormat.format(data.current_price || 0));
   setText("bot-expires-at", formatBotExpiry(data.expires_at));
   const activeAlerts = data.alerts || [];
+  botKeyLevelContext = {
+    market: data.market || activeMarket,
+    chatId: botSelectedChatId,
+    activeAlerts: activeAlerts.filter((alert) => alert.status === "active"),
+  };
   const alerts = data.today_alerts || activeAlerts;
   const breachedCount = alerts.filter((alert) => alert.status === "breached").length;
   setText("bot-alert-count", String(alerts.length));
@@ -1126,6 +1256,11 @@ function renderBotAlerts(data) {
         </div>
       </div>`;
   }).join("");
+  if (latestPayload) {
+    renderKeyLevelViews(latestPayload);
+    lastChartSignature = "";
+    drawSelectedChart(latestPayload, true);
+  }
 }
 
 async function refreshBotAlerts(chatId = botSelectedChatId) {
@@ -2392,33 +2527,16 @@ function chartFocusTimestampMs(data) {
 }
 
 function drawSelectedChart(data, force = false) {
-  const support = Number(data.frames?.["1m"]?.support);
-  const resistance = Number(data.frames?.["1m"]?.resistance);
-  const atr1 = Number(data.frames?.["1m"]?.atr14);
-  const spread = Number(data.ticker?.spread);
-  const levelHalfWidth = Math.max(
-    Number.isFinite(atr1) ? atr1 * 0.08 : 0,
-    Number.isFinite(spread) ? spread * 1.5 : 0,
-    0.06,
-  );
-  const supportZone = Number.isFinite(support)
-    ? {
-        center: support,
-        lower: support - levelHalfWidth,
-        upper: support + levelHalfWidth,
-      }
-    : null;
-  const resistanceZone = Number.isFinite(resistance)
-    ? {
-        center: resistance,
-        lower: resistance - levelHalfWidth,
-        upper: resistance + levelHalfWidth,
-      }
-    : null;
+  const keyLevels = displayKeyLevels(data);
+  const supportZone = levelZone(keyLevels.support, data);
+  const resistanceZone = levelZone(keyLevels.resistance, data);
+  const levelSignature = `${keyLevels.source}:${keyLevels.support ?? ""}:${keyLevels.resistance ?? ""}`;
   if (chartMode === "tick") {
     const ticks = data.ticks || [];
     chartFocusMs = chartFocusTimestampMs(data);
-    const signature = ticks.length ? `${ticks.at(-1).timestamp_ms}:${ticks.length}` : "";
+    const signature = ticks.length
+      ? `${ticks.at(-1).timestamp_ms}:${ticks.length}:${levelSignature}`
+      : levelSignature;
     if (force || signature !== lastChartSignature) {
       drawTickChart(ticks, supportZone, resistanceZone);
     }
@@ -2438,7 +2556,7 @@ function drawSelectedChart(data, force = false) {
   const settingsSignature = Object.entries(enabledIndicators)
     .map(([key, value]) => `${key}:${value ? 1 : 0}`)
     .join(",");
-  const signature = `${chartMode}:${data.feed.sequence}:${current.timestamp}:${current.close}:${current.high}:${current.low}:${strategyEnabled}:${settingsSignature}`;
+  const signature = `${chartMode}:${data.feed.sequence}:${current.timestamp}:${current.close}:${current.high}:${current.low}:${strategyEnabled}:${settingsSignature}:${levelSignature}`;
   if (force || signature !== lastChartSignature) {
     drawCandleChart(
       liveCandles,
@@ -2499,7 +2617,6 @@ function render(data) {
   setText("overall-score", `${data.overall.score > 0 ? "+" : ""}${data.overall.score}`);
   setText("bias-title", data.overall.bias === "偏多" ? "多周期动能偏强" : data.overall.bias === "偏空" ? "多周期结构偏弱" : "多空方向尚未统一");
   setText("bias-detail", `1分钟 ${data.frames["1m"].bias}，5分钟 ${data.frames["5m"].bias}，15分钟 ${data.frames["15m"].bias}。`);
-  setText("alert-line", data.plan[0] || "等待新的结构提示");
 
   renderFrames(data.frames);
   renderVolume(data.volume_proxy, data.live_volume);
@@ -2508,20 +2625,7 @@ function render(data) {
   renderScalpStrategy(data);
   drawSelectedChart(data);
 
-  setText("resistance", priceFormat.format(data.frames["1m"].resistance));
-  setText("level-current", priceFormat.format(ticker.last));
-  setText("support", priceFormat.format(data.frames["1m"].support));
-  const planHelpKeys = ["structure_note", "atr_note", "volume_note_help"];
-  $("plan-list").innerHTML = data.plan.map((item, index) => `
-    <li>
-      <span>${item}</span>
-      <button
-        class="info-button"
-        type="button"
-        data-help-key="${planHelpKeys[index] || "live_notes"}"
-        aria-label="查看这条提示的算法"
-      >i</button>
-    </li>`).join("");
+  renderKeyLevelViews(data);
 }
 
 async function refresh() {
@@ -2572,6 +2676,14 @@ document.querySelectorAll(".chart-mode").forEach((button) => {
     if (latestPayload) redrawChartAndCalendar(latestPayload, true);
   });
 });
+
+const scalpToggle = $("scalp-toggle");
+if (scalpToggle) {
+  setScalpExpanded(false);
+  scalpToggle.addEventListener("click", () => {
+    setScalpExpanded(scalpToggle.getAttribute("aria-expanded") !== "true");
+  });
+}
 
 function applyMarketUi() {
   const config = MARKET_CONFIGS[activeMarket];

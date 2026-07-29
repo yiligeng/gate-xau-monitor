@@ -97,9 +97,60 @@ class PriceAlertStore:
         now = now or utc_now()
         expires_at = beijing_day_end(now)
         unique_levels = dedupe_levels(levels)
+        desired_levels = {
+            Decimal(str(level)).quantize(PRICE_PRECISION) for level in unique_levels
+        }
+        local_now = now.astimezone(SHANGHAI)
+        day_start = local_now.replace(hour=0, minute=0, second=0, microsecond=0)
+        day_end = day_start + timedelta(days=1)
         with self._connect() as connection:
-            connection.execute(
+            existing_rows = connection.execute(
                 """
+                SELECT alert.id, alert.level, alert.created_price, alert.side,
+                       alert.expires_at,
+                       trial.direction, trial.entry_price, trial.stop_loss,
+                       trial.take_profit, trial.status
+                FROM app.price_alerts AS alert
+                LEFT JOIN app.point_strategy_trials AS trial
+                  ON trial.price_alert_id = alert.id
+                WHERE alert.chat_id = %s
+                  AND alert.market = %s
+                  AND alert.created_at >= %s
+                  AND alert.created_at < %s
+                ORDER BY alert.created_at ASC, alert.id ASC
+                """,
+                (chat_id, market, day_start, day_end),
+            ).fetchall()
+            existing_by_level = {}
+            for row in existing_rows:
+                normalized_level = Decimal(str(row[1])).quantize(PRICE_PRECISION)
+                if normalized_level not in desired_levels:
+                    continue
+                existing_by_level.setdefault(
+                    normalized_level,
+                    {
+                        "id": row[0],
+                        "level": float(row[1]),
+                        "created_price": float(row[2]),
+                        "side": row[3],
+                        "expires_at": row[4],
+                        "strategy": (
+                            {
+                                "direction": row[5],
+                                "entry_price": float(row[6]),
+                                "stop_loss": float(row[7]),
+                                "take_profit": float(row[8]),
+                                "status": row[9],
+                            }
+                            if row[5] is not None
+                            else None
+                        ),
+                    },
+                )
+            keep_levels = set(existing_by_level)
+            replace_placeholders = ", ".join(["%s"] * len(desired_levels))
+            connection.execute(
+                f"""
                 WITH replaced AS (
                     UPDATE app.price_alerts
                     SET status = 'replaced', updated_at = %s
@@ -107,6 +158,7 @@ class PriceAlertStore:
                       AND market = %s
                       AND status = 'active'
                       AND expires_at > %s
+                      AND ROUND(level::numeric, 2) NOT IN ({replace_placeholders})
                     RETURNING id
                 )
                 UPDATE app.point_strategy_trials AS trial
@@ -117,10 +169,14 @@ class PriceAlertStore:
                 WHERE trial.price_alert_id = replaced.id
                   AND trial.status = 'pending'
                 """,
-                (now, chat_id, market, now, now, now),
+                (now, chat_id, market, now, *desired_levels, now, now),
             )
             rows = []
             for level in unique_levels:
+                normalized_level = Decimal(str(level)).quantize(PRICE_PRECISION)
+                if normalized_level in keep_levels:
+                    rows.append(existing_by_level[normalized_level])
+                    continue
                 plan = build_point_strategy_plan(current_price, level)
                 row = connection.execute(
                     """

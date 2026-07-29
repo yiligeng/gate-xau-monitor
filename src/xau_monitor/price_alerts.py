@@ -398,37 +398,44 @@ class PriceAlertStore:
                   AND alert.market = %s
                   AND alert.created_at >= %s
                   AND alert.created_at < %s
-                ORDER BY alert.level DESC, alert.id DESC
+                ORDER BY alert.level DESC, alert.created_at ASC, alert.id ASC
                 """,
                 (chat_id, market, day_start, day_end),
             ).fetchall()
-        return [
-            {
-                "id": row[0],
-                "level": float(row[1]),
-                "created_price": float(row[2]),
-                "side": row[3],
-                "alerts_sent": int(row[4]),
-                "alert_limit": int(row[5]),
-                "expires_at": row[6],
-                "status": row[7],
-                "created_at": row[8],
-                "last_alert_at": row[9],
-                "breached_at": row[10],
-                "strategy": (
-                    {
-                        "direction": row[11],
-                        "entry_price": float(row[12]),
-                        "stop_loss": float(row[13]),
-                        "take_profit": float(row[14]),
-                        "status": row[15],
+        records = []
+        seen_levels: set[Decimal] = set()
+        for row in rows:
+            normalized_level = Decimal(str(row[1])).quantize(PRICE_PRECISION)
+            if normalized_level in seen_levels:
+                continue
+            seen_levels.add(normalized_level)
+            records.append(
+                {
+                    "id": row[0],
+                    "level": float(row[1]),
+                    "created_price": float(row[2]),
+                    "side": row[3],
+                    "alerts_sent": int(row[4]),
+                    "alert_limit": int(row[5]),
+                    "expires_at": row[6],
+                    "status": row[7],
+                    "created_at": row[8],
+                    "last_alert_at": row[9],
+                    "breached_at": row[10],
+                    "strategy": (
+                        {
+                            "direction": row[11],
+                            "entry_price": float(row[12]),
+                            "stop_loss": float(row[13]),
+                            "take_profit": float(row[14]),
+                            "status": row[15],
+                        }
+                        if row[11] is not None
+                        else None
+                    ),
                     }
-                    if row[11] is not None
-                    else None
-                ),
-            }
-            for row in rows
-        ]
+            )
+        return records
 
     def chat_summaries(
         self,

@@ -9,11 +9,20 @@ from zoneinfo import ZoneInfo
 SHANGHAI = ZoneInfo("Asia/Shanghai")
 NEW_YORK = ZoneInfo("America/New_York")
 LONDON = ZoneInfo("Europe/London")
+TOKYO = ZoneInfo("Asia/Tokyo")
 
 FED_CALENDAR_URL = "https://www.federalreserve.gov/newsevents/calendar.htm"
 BLS_SCHEDULE_URL = "https://www.bls.gov/schedule/2026/home.htm"
 BEA_SCHEDULE_URL = "https://www.bea.gov/news/schedule"
 ICE_LBMA_URL = "https://www.ice.com/iba/lbma-precious-metals"
+CME_GOLD_URL = "https://www.cmegroup.com/markets/metals/precious/gold.html"
+EIA_PETROLEUM_URL = "https://www.eia.gov/petroleum/supply/weekly/schedule.php"
+TREASURY_AUCTIONS_URL = "https://www.treasurydirect.gov/auctions/upcoming/"
+API_WSB_URL = "https://www.api.org/products-and-services/statistics/api-weekly-statistical-bulletin"
+BOJ_CALENDAR_URL = "https://www.boj.or.jp/en/mopo/mpmsche_minu/index.htm"
+CFETS_PARITY_URL = "https://www.chinamoney.com.cn/english/bmkcpr/"
+NBS_RELEASE_URL = "https://www.stats.gov.cn/english/PressRelease/ReleaseCalendar/202512/t20251226_1962154.html"
+SSE_TRADING_URL = "https://english.sse.com.cn/start/trading/schedule/"
 ISM_CALENDAR_URL = (
     "https://www.ismworld.org/supply-management-news-and-reports/reports/"
     "rob-report-calendar/"
@@ -23,6 +32,10 @@ SOURCE_URLS = {
     "BLS": BLS_SCHEDULE_URL,
     "BEA": BEA_SCHEDULE_URL,
     "ISM": ISM_CALENDAR_URL,
+    "BOJ": BOJ_CALENDAR_URL,
+    "CFETS": CFETS_PARITY_URL,
+    "NBS": NBS_RELEASE_URL,
+    "SSE": SSE_TRADING_URL,
 }
 
 
@@ -37,6 +50,7 @@ class EventSpec:
     category: str
     note: str = ""
     source_url: str = ""
+    timezone: ZoneInfo = NEW_YORK
 
 
 FOMC_DECISION_DATES = [
@@ -44,6 +58,13 @@ FOMC_DECISION_DATES = [
     date(2026, 9, 16),
     date(2026, 10, 28),
     date(2026, 12, 9),
+]
+
+BOJ_DECISION_DATES = [
+    date(2026, 7, 31),
+    date(2026, 9, 18),
+    date(2026, 10, 30),
+    date(2026, 12, 18),
 ]
 
 US_MACRO_EVENTS = [
@@ -92,6 +113,16 @@ def market_calendar_payload(now: datetime | None = None) -> dict[str, Any]:
 def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
     local_day = now.astimezone(SHANGHAI).date()
     windows = [
+        _window_from_shanghai(
+            now,
+            local_day,
+            "亚洲午饭震荡窗",
+            time(10, 25),
+            time(13, 5),
+            "震荡",
+            "无日银/中国数据覆盖时，东京和中港午休更适合等假突破收回",
+            source_url=SSE_TRADING_URL,
+        ),
         _window_from_london(
             now,
             local_day,
@@ -110,6 +141,16 @@ def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
             "震荡",
             "美国午间深度变薄，突破更容易变成假突破",
         ),
+        _window_from_new_york(
+            now,
+            local_day,
+            "COMEX 日切低流动性",
+            time(16, 50),
+            time(18, 10),
+            "低流动性",
+            "CME 黄金期货日内休市前后，点差和滑点容易放大",
+            source_url=CME_GOLD_URL,
+        ),
     ]
     return sorted(windows, key=lambda item: item["start"])
 
@@ -117,6 +158,45 @@ def daily_risk_windows(now: datetime) -> list[dict[str, Any]]:
 def daily_volatility_windows(now: datetime) -> list[dict[str, Any]]:
     local_day = now.astimezone(SHANGHAI).date()
     windows = [
+        _window_from_tokyo(
+            now,
+            local_day,
+            "东京盘启动",
+            time(8, 55),
+            time(9, 30),
+            "中高",
+            "日元和亚洲避险资金开始活跃",
+        ),
+        _window_from_shanghai(
+            now,
+            local_day,
+            "人民币中间价",
+            time(9, 10),
+            time(9, 25),
+            "中高",
+            "USD/CNY fixing 会影响美元指数和亚洲风险偏好",
+            source_url=CFETS_PARITY_URL,
+        ),
+        _window_from_shanghai(
+            now,
+            local_day,
+            "中国开盘/宏观窗",
+            time(9, 25),
+            time(10, 5),
+            "中高",
+            "A股、港股和中国 09:30 数据容易带动亚洲黄金",
+            source_url=NBS_RELEASE_URL,
+        ),
+        _window_from_shanghai(
+            now,
+            local_day,
+            "亚洲尾盘",
+            time(14, 55),
+            time(15, 15),
+            "中",
+            "A股收盘和东京尾盘，亚洲资金常在这里调仓",
+            source_url=SSE_TRADING_URL,
+        ),
         _window_from_london(
             now,
             local_day,
@@ -149,6 +229,16 @@ def daily_volatility_windows(now: datetime) -> list[dict[str, Any]]:
         _window_from_new_york(
             now,
             local_day,
+            "美国二次数据窗",
+            time(9, 55),
+            time(10, 10),
+            "高",
+            "ISM、JOLTS、成屋销售等常在 10:00 ET 公布",
+            source_url=ISM_CALENDAR_URL,
+        ),
+        _window_from_new_york(
+            now,
+            local_day,
             "纽约主波动",
             time(9, 30),
             time(11, 30),
@@ -165,7 +255,18 @@ def daily_volatility_windows(now: datetime) -> list[dict[str, Any]]:
             "伦敦下午定盘，常与纽约早盘重叠",
             source_url=ICE_LBMA_URL,
         ),
+        _window_from_new_york(
+            now,
+            local_day,
+            "美债拍卖结果窗",
+            time(12, 55),
+            time(13, 10),
+            "高",
+            "美债需求会带动收益率、美元和黄金二次定价",
+            source_url=TREASURY_AUCTIONS_URL,
+        ),
     ]
+    windows.extend(_weekly_energy_windows(now, local_day))
     return sorted(windows, key=lambda item: item["start"])
 
 
@@ -189,7 +290,54 @@ def event_risk_windows(
                 source_url=FED_CALENDAR_URL,
             )
         )
+    if any(event["category"] == "boj" for event in events):
+        decision = next(event for event in events if event["category"] == "boj")
+        start = datetime.fromisoformat(decision["time"]) - timedelta(minutes=15)
+        end = datetime.fromisoformat(decision["time"]) + timedelta(hours=4)
+        windows.append(
+            _window(
+                "BOJ 议息日",
+                start,
+                end,
+                "最高",
+                "日元利率预期变化会牵动美元和黄金避险交易",
+                now,
+                source_url=BOJ_CALENDAR_URL,
+            )
+        )
     return sorted(windows, key=lambda item: item["start"])
+
+
+def _weekly_energy_windows(now: datetime, local_day: date) -> list[dict[str, Any]]:
+    windows: list[dict[str, Any]] = []
+    ny_day = _new_york_day_for_local_session(local_day)
+    if ny_day.weekday() == 1:
+        windows.append(
+            _window_from_new_york(
+                now,
+                local_day,
+                "API 原油库存",
+                time(16, 25),
+                time(16, 40),
+                "中高",
+                "油价异动会传导到通胀预期和黄金",
+                source_url=API_WSB_URL,
+            )
+        )
+    if ny_day.weekday() == 2:
+        windows.append(
+            _window_from_new_york(
+                now,
+                local_day,
+                "EIA 原油库存",
+                time(10, 25),
+                time(10, 45),
+                "高",
+                "原油库存超预期时，通胀交易容易同步波动",
+                source_url=EIA_PETROLEUM_URL,
+            )
+        )
+    return windows
 
 
 def today_event_list(now: datetime) -> list[dict[str, Any]]:
@@ -198,6 +346,7 @@ def today_event_list(now: datetime) -> list[dict[str, Any]]:
     horizon_end = datetime.combine(local_day + timedelta(days=1), time(4, 0), tzinfo=SHANGHAI)
     specs = list(US_MACRO_EVENTS)
     specs.extend(_fomc_specs())
+    specs.extend(_boj_specs())
     specs.extend(_ism_specs(local_day))
     events = [_event_payload(spec, now) for spec in specs]
     return sorted(
@@ -244,6 +393,38 @@ def _fomc_specs() -> list[EventSpec]:
                 "Federal Reserve",
                 "fomc",
                 "发布会问答容易二次波动",
+            )
+        )
+    return specs
+
+
+def _boj_specs() -> list[EventSpec]:
+    specs: list[EventSpec] = []
+    for decision_date in BOJ_DECISION_DATES:
+        specs.append(
+            EventSpec(
+                decision_date,
+                11,
+                45,
+                "BOJ 利率决议观察窗",
+                "最高",
+                "BOJ",
+                "boj",
+                "日银决议发布时间不固定，通常在东京午前后",
+                timezone=TOKYO,
+            )
+        )
+        specs.append(
+            EventSpec(
+                decision_date,
+                15,
+                30,
+                "BOJ 发布会",
+                "高",
+                "BOJ",
+                "boj_press",
+                "发布会会解释政策取向，日元可能二次波动",
+                timezone=TOKYO,
             )
         )
     return specs
@@ -320,7 +501,7 @@ def _event_payload(spec: EventSpec, now: datetime) -> dict[str, Any]:
     event_time = datetime.combine(
         spec.date,
         time(spec.hour, spec.minute),
-        NEW_YORK,
+        spec.timezone,
     ).astimezone(SHANGHAI)
     return {
         "time": event_time.isoformat(),
@@ -345,14 +526,18 @@ def _window_from_new_york(
     note: str,
     source_url: str = "",
 ) -> dict[str, Any]:
-    ny_day = datetime.combine(
+    ny_day = _new_york_day_for_local_session(local_day)
+    start = datetime.combine(ny_day, start_time, NEW_YORK).astimezone(SHANGHAI)
+    end = datetime.combine(ny_day, end_time, NEW_YORK).astimezone(SHANGHAI)
+    return _window(title, start, end, impact, note, now, source_url=source_url)
+
+
+def _new_york_day_for_local_session(local_day: date) -> date:
+    return datetime.combine(
         local_day,
         time(12, 0),
         SHANGHAI,
     ).astimezone(NEW_YORK).date()
-    start = datetime.combine(ny_day, start_time, NEW_YORK).astimezone(SHANGHAI)
-    end = datetime.combine(ny_day, end_time, NEW_YORK).astimezone(SHANGHAI)
-    return _window(title, start, end, impact, note, now, source_url=source_url)
 
 
 def _window_from_london(
@@ -367,6 +552,41 @@ def _window_from_london(
 ) -> dict[str, Any]:
     start = datetime.combine(local_day, start_time, LONDON).astimezone(SHANGHAI)
     end = datetime.combine(local_day, end_time, LONDON).astimezone(SHANGHAI)
+    return _window(title, start, end, impact, note, now, source_url=source_url)
+
+
+def _window_from_tokyo(
+    now: datetime,
+    local_day: date,
+    title: str,
+    start_time: time,
+    end_time: time,
+    impact: str,
+    note: str,
+    source_url: str = "",
+) -> dict[str, Any]:
+    tokyo_day = datetime.combine(
+        local_day,
+        time(12, 0),
+        SHANGHAI,
+    ).astimezone(TOKYO).date()
+    start = datetime.combine(tokyo_day, start_time, TOKYO).astimezone(SHANGHAI)
+    end = datetime.combine(tokyo_day, end_time, TOKYO).astimezone(SHANGHAI)
+    return _window(title, start, end, impact, note, now, source_url=source_url)
+
+
+def _window_from_shanghai(
+    now: datetime,
+    local_day: date,
+    title: str,
+    start_time: time,
+    end_time: time,
+    impact: str,
+    note: str,
+    source_url: str = "",
+) -> dict[str, Any]:
+    start = datetime.combine(local_day, start_time, SHANGHAI)
+    end = datetime.combine(local_day, end_time, SHANGHAI)
     return _window(title, start, end, impact, note, now, source_url=source_url)
 
 

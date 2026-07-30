@@ -17,12 +17,44 @@ from xau_monitor.price_alerts import (
     strategy_status_for_price,
 )
 from xau_monitor.wecom_bot import (
+    _handle_alert_command,
     extract_chat_id,
     format_market_reply,
     format_strategy_stats,
     help_message,
     select_market_id,
 )
+
+
+class FakeMarketState:
+    def payload(self) -> dict:
+        return {"ok": True, "ticker": {"last": 4008.21}}
+
+
+class FakeAlertStore:
+    def __init__(self) -> None:
+        self.merged_levels: list[float] = []
+
+    def merge_today_alerts(
+        self,
+        chat_id: str,
+        market: str,
+        levels: list[float],
+        current_price: float,
+        created_by: str,
+        source_text: str,
+    ) -> list[dict]:
+        self.merged_levels = levels
+        return [
+            {
+                "level": level,
+                "created_price": current_price,
+                "side": "below",
+                "expires_at": None,
+                "strategy": None,
+            }
+            for level in levels
+        ]
 
 
 class WeComBotFormatterTests(unittest.TestCase):
@@ -35,6 +67,25 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertIn("今日点位", help_message())
         self.assertIn("覆盖今日点位", help_message())
         self.assertIn("标记触达点位", help_message())
+        self.assertNotIn("覆盖今天旧点位", help_message())
+        self.assertIn("同价点位保留原状态", help_message())
+
+    def test_today_level_command_merges_without_replace_language(self) -> None:
+        store = FakeAlertStore()
+
+        reply = _handle_alert_command(
+            "黄金 覆盖今日点位 3991.44 3989.48",
+            {"body": {"chatid": "group1", "userid": "u1"}},
+            {"xau": FakeMarketState()},
+            store,
+        )
+
+        self.assertEqual(store.merged_levels, [3991.44, 3989.48])
+        self.assertIsNotNone(reply)
+        assert reply is not None
+        self.assertIn("已合并", reply)
+        self.assertIn("已有同价点位保留原状态", reply)
+        self.assertNotIn("已覆盖今天旧点位", reply)
 
     def test_formats_market_reply(self) -> None:
         reply = format_market_reply(

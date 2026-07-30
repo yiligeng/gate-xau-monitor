@@ -84,7 +84,7 @@ class PriceAlertStore:
             application_name="xau-monitor-price-alerts",
         )
 
-    def replace_today_alerts(
+    def merge_today_alerts(
         self,
         chat_id: str,
         market: str,
@@ -147,34 +147,10 @@ class PriceAlertStore:
                         ),
                     },
                 )
-            keep_levels = set(existing_by_level)
-            replace_placeholders = ", ".join(["%s"] * len(desired_levels))
-            connection.execute(
-                f"""
-                WITH replaced AS (
-                    UPDATE app.price_alerts
-                    SET status = 'replaced', updated_at = %s
-                    WHERE chat_id = %s
-                      AND market = %s
-                      AND status = 'active'
-                      AND expires_at > %s
-                      AND ROUND(level::numeric, 2) NOT IN ({replace_placeholders})
-                    RETURNING id
-                )
-                UPDATE app.point_strategy_trials AS trial
-                SET status = 'replaced',
-                    resolved_at = %s,
-                    updated_at = %s
-                FROM replaced
-                WHERE trial.price_alert_id = replaced.id
-                  AND trial.status = 'pending'
-                """,
-                (now, chat_id, market, now, *desired_levels, now, now),
-            )
             rows = []
             for level in unique_levels:
                 normalized_level = Decimal(str(level)).quantize(PRICE_PRECISION)
-                if normalized_level in keep_levels:
+                if normalized_level in existing_by_level:
                     rows.append(existing_by_level[normalized_level])
                     continue
                 plan = build_point_strategy_plan(current_price, level)
@@ -243,6 +219,26 @@ class PriceAlertStore:
                     }
                 )
         return rows
+
+    def replace_today_alerts(
+        self,
+        chat_id: str,
+        market: str,
+        levels: list[float],
+        current_price: float,
+        created_by: str,
+        source_text: str,
+        now: datetime | None = None,
+    ) -> list[dict[str, Any]]:
+        return self.merge_today_alerts(
+            chat_id=chat_id,
+            market=market,
+            levels=levels,
+            current_price=current_price,
+            created_by=created_by,
+            source_text=source_text,
+            now=now,
+        )
 
     def cancel_today_alerts(
         self,

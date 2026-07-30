@@ -59,8 +59,8 @@ def help_message() -> str:
             "可用指令：",
             "- 黄金 / XAU：查看 XAUUSD 快照",
             "- BTC：查看 BTCUSDT 永续快照",
-            "- 黄金 今日点位 4093.67 4087.70：覆盖今天旧点位并设置新提醒",
-            "- 黄金 覆盖今日点位 4093.67 4087.70：同上，明确替换今天现有点位",
+            "- 黄金 今日点位 4093.67 4087.70：追加今天点位；同价点位保留原状态",
+            "- 黄金 覆盖今日点位 4093.67 4087.70：兼容旧说法，实际按追加/合并处理",
             "- 黄金 标记触达点位 4040-4050：区间内今天点位改为已触达，不再告警",
             "- 黄金 点位：查看今天全部提醒记录（含已触达）",
             "- 黄金 取消今日点位：清空今天的提醒",
@@ -300,7 +300,7 @@ def _handle_alert_command(
         current_price = _current_price(states, market_id)
         if current_price is None:
             return "行情还没初始化，等几秒后再发一次今日点位。"
-        rows = alert_store.replace_today_alerts(
+        rows = alert_store.merge_today_alerts(
             chat_id=chat_id,
             market=market_id,
             levels=parsed.levels,
@@ -311,10 +311,11 @@ def _handle_alert_command(
         expires_at = beijing_day_end(datetime.now(SHANGHAI))
         return "\n".join(
             [
-                f"已覆盖今天旧点位，并设置 {market_display_name(market_id)} 今日点位 {len(rows)} 条。",
+                f"已合并 {market_display_name(market_id)} 今日点位 {len(rows)} 条。",
                 f"当前价：{current_price:,.2f}",
                 f"点位：{_format_levels([row['level'] for row in rows])}",
                 f"有效期：北京时间 {expires_at:%m-%d %H:%M}",
+                "说明：已有同价点位保留原状态，未出现过的点位才新增。",
                 "规则：距离<=3提醒，最多2次；触达点位后作废。",
                 "验证：下方点位做多、上方点位做空；止盈/止损各5美元。",
             ]
@@ -344,7 +345,7 @@ def _handle_alert_command(
             "active": "监控中",
             "breached": "已触达",
             "expired": "已过期",
-            "replaced": "已覆盖",
+            "replaced": "已停用",
             "cancelled": "已取消",
         }
         lines = [f"{market_display_name(market_id)} 今日点位记录："]

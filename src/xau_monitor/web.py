@@ -440,7 +440,7 @@ def make_handler(
                 self._change_credentials(session)
                 return
             if path == "/api/bot/alerts":
-                self._bot_alerts_replace()
+                self._bot_alerts_merge()
                 return
             if path == "/api/bot/alerts/cancel":
                 self._bot_alerts_cancel()
@@ -505,7 +505,7 @@ def make_handler(
             response["market"] = market_id
             self._send_json({"ok": True} | response)
 
-        def _bot_alerts_replace(self) -> None:
+        def _bot_alerts_merge(self) -> None:
             if alert_store is None:
                 self._send_error_json(503, "机器人点位数据库未启用")
                 return
@@ -531,7 +531,7 @@ def make_handler(
                     )
                     return
                 current_price = float(market_payload["ticker"]["last"])
-                rows = alert_store.replace_today_alerts(
+                rows = alert_store.merge_today_alerts(
                     chat_id=chat_id,
                     market=market_id,
                     levels=levels,

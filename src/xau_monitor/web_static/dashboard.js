@@ -580,6 +580,19 @@ function timelineItemStyle(timelineItem) {
   return `--left:${timelineItem.leftPx.toFixed(1)}px;--width:${timelineItem.widthPx.toFixed(1)}px;--top:${top}px;`;
 }
 
+function calendarSourceLinkHtml(item) {
+  if (!item?.source_url) return "";
+  return `
+    <a
+      class="calendar-source-link"
+      href="${escapeHtml(item.source_url)}"
+      target="_blank"
+      rel="noopener noreferrer"
+      aria-label="打开${escapeHtml(item.title || "事件")}来源"
+    >来源</a>
+  `;
+}
+
 function renderTimelineTicks(bounds) {
   if (!bounds) return "";
   const ticks = [];
@@ -612,6 +625,7 @@ function timelineItemHtml(timelineItem, focusMs) {
       <div class="timeline-item event ${tone} ${item.status} ${focusClass}" style="${style}">
         <div class="calendar-chip-top">
           <span>${escapeHtml(item.title)}</span>
+          ${calendarSourceLinkHtml(item)}
           <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
         </div>
         <strong>${escapeHtml(item.time_label)} · ${escapeHtml(item.source)}</strong>
@@ -627,6 +641,7 @@ function timelineItemHtml(timelineItem, focusMs) {
     <div class="timeline-item ${kind} ${tone} ${item.status} ${focusClass}" style="${style}">
       <div class="calendar-chip-top">
         <span>${escapeHtml(item.title)}</span>
+        ${calendarSourceLinkHtml(item)}
         <button class="info-button calendar-info" type="button" data-help-key="${helpKey}" aria-label="查看${escapeHtml(item.title)}说明">i</button>
       </div>
       <strong>${escapeHtml(item.time_label)} · ${escapeHtml(item.note)}</strong>
@@ -902,7 +917,7 @@ const BOT_STRATEGY_STATUS_LABELS = {
   loss: "负",
   ambiguous: "顺序待复核",
   expired: "未触发",
-  replaced: "已覆盖",
+  replaced: "已停用",
   cancelled: "已取消",
 };
 
@@ -1219,7 +1234,7 @@ function renderBotAlerts(data) {
     active: "监控中",
     breached: "已触达",
     expired: "已过期",
-    replaced: "已覆盖",
+    replaced: "已停用",
     cancelled: "已取消",
   };
   list.innerHTML = alerts.map((alert) => {
@@ -2766,7 +2781,7 @@ $("strategy-help-link")?.addEventListener("click", (event) => {
   const href = event.currentTarget.getAttribute("href");
   if (!href || href === "#") return;
   event.preventDefault();
-  window.location.assign(href);
+  window.open(href, "_blank", "noopener,noreferrer");
 });
 window.addEventListener("keydown", (event) => {
   if (event.key === "Escape") closeStrategyHelp();

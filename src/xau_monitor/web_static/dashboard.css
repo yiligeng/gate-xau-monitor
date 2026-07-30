@@ -551,6 +551,22 @@ h2 { margin: 0; font-size: 17px; letter-spacing: -.02em; }
   justify-content: space-between;
   gap: 8px;
 }
+.calendar-chip-top span { flex: 1; min-width: 0; }
+.calendar-source-link {
+  flex: 0 0 auto;
+  padding: 1px 5px;
+  border: 1px solid rgba(255,255,255,.16);
+  border-radius: 6px;
+  color: var(--gold);
+  font-size: 8px;
+  line-height: 1.2;
+  text-decoration: none;
+}
+.calendar-source-link:hover,
+.calendar-source-link:focus-visible {
+  border-color: rgba(242,207,102,.58);
+  background: rgba(242,207,102,.1);
+}
 .calendar-info {
   width: 13px;
   height: 13px;

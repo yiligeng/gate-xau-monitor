@@ -1,10 +1,71 @@
 import unittest
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
-from xau_monitor.reversal_hypothesis import build_hypothesis_dashboard
+from xau_monitor.reversal_hypothesis import (
+    ReversalHypothesisStore,
+    build_hypothesis_dashboard,
+)
+
+
+class FakeCursor:
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def executemany(self, sql, rows):
+        self.sql = sql
+        self.rows = rows
+
+
+class FakeConnection:
+    def __init__(self):
+        self.fake_cursor = FakeCursor()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *_args):
+        return False
+
+    def cursor(self):
+        return self.fake_cursor
 
 
 class ReversalHypothesisTests(unittest.TestCase):
+    def test_upserts_only_completed_candles_through_cursor(self) -> None:
+        now = datetime(2026, 7, 31, 4, 30, 30, tzinfo=timezone.utc)
+        candles = [
+            SimpleNamespace(
+                timestamp=int(now.timestamp()) - 90,
+                open=1,
+                high=2,
+                low=1,
+                close=2,
+            ),
+            SimpleNamespace(
+                timestamp=int(now.timestamp()) - 30,
+                open=2,
+                high=3,
+                low=2,
+                close=3,
+            ),
+        ]
+        store = ReversalHypothesisStore("postgresql://unused")
+        connection = FakeConnection()
+        store._connect = lambda: connection
+
+        saved = store.upsert_completed_candles("xau", candles, now=now)
+
+        self.assertEqual(saved, 1)
+        self.assertIn(
+            "INSERT INTO app.market_candles_1m",
+            connection.fake_cursor.sql,
+        )
+        self.assertEqual(len(connection.fake_cursor.rows), 1)
+
     def test_classifies_selected_minute_persistent_reversal(self) -> None:
         start = datetime(2026, 7, 31, 2, 0, tzinfo=timezone.utc)
         candles = []

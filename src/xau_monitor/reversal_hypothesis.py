@@ -68,23 +68,24 @@ class ReversalHypothesisStore:
         if not rows:
             return 0
         with self._connect() as connection:
-            connection.executemany(
-                """
-                INSERT INTO app.market_candles_1m (
-                    market, opened_at, open, high, low, close,
-                    source, updated_at
+            with connection.cursor() as cursor:
+                cursor.executemany(
+                    """
+                    INSERT INTO app.market_candles_1m (
+                        market, opened_at, open, high, low, close,
+                        source, updated_at
+                    )
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (market, opened_at) DO UPDATE
+                    SET open = EXCLUDED.open,
+                        high = EXCLUDED.high,
+                        low = EXCLUDED.low,
+                        close = EXCLUDED.close,
+                        source = EXCLUDED.source,
+                        updated_at = EXCLUDED.updated_at
+                    """,
+                    rows,
                 )
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                ON CONFLICT (market, opened_at) DO UPDATE
-                SET open = EXCLUDED.open,
-                    high = EXCLUDED.high,
-                    low = EXCLUDED.low,
-                    close = EXCLUDED.close,
-                    source = EXCLUDED.source,
-                    updated_at = EXCLUDED.updated_at
-                """,
-                rows,
-            )
         return len(rows)
 
     def dashboard(

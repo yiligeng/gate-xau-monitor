@@ -112,9 +112,15 @@ class ReversalHypothesisTests(unittest.TestCase):
         self.assertEqual(result["recent"][0]["trade_direction"], "short")
         self.assertEqual(result["recent"][0]["classification"], "persistent")
         minute_30 = next(row for row in result["anchors"] if row["minute"] == 30)
-        self.assertAlmostEqual(minute_30["average_return_1"], 0.13)
-        self.assertAlmostEqual(minute_30["average_return_5"], 0.65)
-        self.assertAlmostEqual(minute_30["average_return_15"], 1.95)
+        one_minute = minute_30["average_outcomes"]["1"]
+        self.assertEqual(one_minute["reversed"]["count"], 0)
+        self.assertIsNone(one_minute["reversed"]["average_return"])
+        self.assertEqual(one_minute["not_reversed"]["count"], 1)
+        self.assertAlmostEqual(one_minute["not_reversed"]["average_return"], 0.13)
+        five_minute = minute_30["average_outcomes"]["5"]
+        self.assertEqual(five_minute["reversed"]["count"], 1)
+        self.assertAlmostEqual(five_minute["reversed"]["average_return"], 0.65)
+        self.assertEqual(five_minute["not_reversed"]["count"], 0)
         self.assertEqual(result["recent"][0]["signal_open_price"], 100.0)
         self.assertEqual(result["recent"][0]["signal_close_price"], 102.0)
         self.assertEqual(result["recent"][0]["entry_price"], 102.0)

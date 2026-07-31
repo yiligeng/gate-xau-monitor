@@ -303,9 +303,15 @@ tbody tr:hover td { background: #15191b; }
 .negative { color: var(--red); }
 .neutral { color: var(--muted); }
 
-.average-outcome strong,
-.average-outcome small { display: block; }
-.average-outcome small { margin-top: 4px; font-size: 11px; }
+.anchor-section table { min-width: 1240px; }
+.average-outcome { min-width: 180px; }
+.average-group { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.average-group + .average-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--line); }
+.average-group > span { color: var(--muted); font-size: 11px; }
+.average-group strong,
+.average-group small { display: block; text-align: right; }
+.average-group small { margin-top: 3px; font-size: 11px; }
+.average-group.empty small { margin-top: 0; color: var(--muted); }
 
 .audit-table { min-width: 1440px; }
 .audit-table th,

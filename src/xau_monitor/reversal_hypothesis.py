@@ -402,12 +402,13 @@ def _summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
         "delayed": delayed,
         "faded": faded,
         "no_reversal": no_reversal,
-        "average_return_1": _average(qualified, "return_1"),
-        "average_return_5": _average(qualified, "return_5"),
-        "average_return_15": _average(qualified, "return_15"),
-        "average_return_1_atr": _average(qualified, "return_1_atr"),
-        "average_return_5_atr": _average(qualified, "return_5_atr"),
-        "average_return_15_atr": _average(qualified, "return_15_atr"),
+        "average_outcomes": {
+            str(minutes): {
+                "reversed": _outcome_average(qualified, minutes, True),
+                "not_reversed": _outcome_average(qualified, minutes, False),
+            }
+            for minutes in (1, 5, 15)
+        },
         "confidence_5": _wilson_interval(reversal_5, sample_count),
         "confidence_15": _wilson_interval(reversal_15, sample_count),
     }
@@ -421,6 +422,23 @@ def _average(events: list[dict[str, Any]], key: str) -> float | None:
     if not events:
         return None
     return round(sum(float(event[key]) for event in events) / len(events), 4)
+
+
+def _outcome_average(
+    events: list[dict[str, Any]],
+    minutes: int,
+    reversed_only: bool,
+) -> dict[str, Any]:
+    matching = [
+        event
+        for event in events
+        if bool(event[f"reversal_{minutes}"]) is reversed_only
+    ]
+    return {
+        "count": len(matching),
+        "average_return": _average(matching, f"return_{minutes}"),
+        "average_return_atr": _average(matching, f"return_{minutes}_atr"),
+    }
 
 
 def _wilson_interval(successes: int, total: int) -> dict[str, float] | None:

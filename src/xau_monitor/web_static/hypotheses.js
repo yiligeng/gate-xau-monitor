@@ -140,21 +140,36 @@ function renderAnchors(rows) {
       <td>${rate(row.reversal_rate_5)}</td>
       <td>${rate(row.reversal_rate_15)}</td>
       <td>${rate(row.persistent_rate)}</td>
-      ${averageOutcome(row, 1)}
-      ${averageOutcome(row, 5)}
-      ${averageOutcome(row, 15)}
+      ${groupedAverageOutcome(row, 1)}
+      ${groupedAverageOutcome(row, 5)}
+      ${groupedAverageOutcome(row, 15)}
     </tr>
   `).join("");
 }
 
-function averageOutcome(row, minutes) {
-  const dollarResult = row[`average_return_${minutes}`];
-  const atrResult = row[`average_return_${minutes}_atr`];
+function groupedAverageOutcome(row, minutes) {
+  const outcome = row.average_outcomes?.[String(minutes)] || {};
   return `
     <td class="average-outcome">
-      <strong class="${resultClass(dollarResult)}">${money(dollarResult)}</strong>
-      <small class="${resultClass(atrResult)}">${signed(atrResult, " ATR")}</small>
+      ${averageGroup("成功", outcome.reversed)}
+      ${averageGroup("未反转", outcome.not_reversed)}
     </td>
+  `;
+}
+
+function averageGroup(label, group) {
+  const count = Number(group?.count || 0);
+  if (!count) return `<div class="average-group empty"><span>${label} 0次</span><small>无样本</small></div>`;
+  const dollarResult = group.average_return;
+  const atrResult = group.average_return_atr;
+  return `
+    <div class="average-group">
+      <span>${label} ${count}次</span>
+      <div>
+        <strong class="${resultClass(dollarResult)}">${money(dollarResult)}</strong>
+        <small class="${resultClass(atrResult)}">${signed(atrResult, " ATR")}</small>
+      </div>
+    </div>
   `;
 }
 

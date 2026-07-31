@@ -303,7 +303,7 @@ tbody tr:hover td { background: #15191b; }
 .negative { color: var(--red); }
 .neutral { color: var(--muted); }
 
-.audit-table { min-width: 1240px; }
+.audit-table { min-width: 1440px; }
 .audit-table th,
 .audit-table td { text-align: left; vertical-align: middle; }
 .audit-time strong,
@@ -316,6 +316,7 @@ tbody tr:hover td { background: #15191b; }
 .price-cell small { margin-top: 5px; color: var(--muted); font-size: 11px; }
 .outcome-line.positive { color: var(--green); }
 .outcome-line.negative { color: var(--red); }
+.reversal-state { display: block; margin-top: 7px; font-size: 12px; }
 .result-cell strong { display: block; }
 .chart-toggle {
   margin-top: 10px;

@@ -112,6 +112,7 @@ class ReversalHypothesisTests(unittest.TestCase):
         self.assertEqual(result["recent"][0]["signal_open_price"], 100.0)
         self.assertEqual(result["recent"][0]["signal_close_price"], 102.0)
         self.assertEqual(result["recent"][0]["entry_price"], 102.0)
+        self.assertAlmostEqual(result["recent"][0]["price_1"], 101.87)
         self.assertAlmostEqual(result["recent"][0]["price_5"], 101.35)
         self.assertAlmostEqual(result["recent"][0]["price_15"], 100.05)
         self.assertAlmostEqual(result["recent"][0]["high_5"], 102.2)
@@ -121,6 +122,8 @@ class ReversalHypothesisTests(unittest.TestCase):
         self.assertAlmostEqual(result["recent"][0]["pre_5_open_price"], 100.0)
         self.assertAlmostEqual(result["recent"][0]["pre_5_high"], 102.0)
         self.assertAlmostEqual(result["recent"][0]["pre_5_low"], 99.5)
+        self.assertAlmostEqual(result["recent"][0]["return_1"], 0.13)
+        self.assertFalse(result["recent"][0]["reversal_1"])
         self.assertAlmostEqual(result["recent"][0]["return_5"], 0.65)
         self.assertAlmostEqual(result["recent"][0]["return_15"], 1.95)
         chart = result["recent"][0]["chart_candles"]

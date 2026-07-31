@@ -196,6 +196,7 @@ function renderCandleChart(row) {
   const entryY = y(row.entry_price);
   const markers = [
     { minute: 0, label: "观察点" },
+    { minute: 1, label: "+1分" },
     { minute: 5, label: "+5分" },
     { minute: 15, label: "+15分" },
   ].map((marker) => `
@@ -230,12 +231,17 @@ function renderCandleChart(row) {
 function renderAudit(rows) {
   const target = $("audit-body");
   if (!rows?.length) {
-    target.innerHTML = '<tr><td class="empty-row" colspan="6">还没有走满15分钟的有效样本。</td></tr>';
+    target.innerHTML = '<tr><td class="empty-row" colspan="7">还没有走满15分钟的有效样本。</td></tr>';
     return;
   }
   target.innerHTML = rows.map((row, index) => {
     const direction = row.trade_direction === "long" ? "准备做多" : "准备做空";
     const signal = row.signal_direction === "up" ? "上涨" : "下跌";
+    const oneMinuteState = row.reversal_1
+      ? "已反转"
+      : Number(row.return_1 || 0) > 0
+        ? "反向但未达标"
+        : "未反转";
     const chartId = `sample-chart-${index}`;
     return `
       <tr class="sample-row">
@@ -253,6 +259,13 @@ function renderAudit(rows) {
           <strong>${price(row.entry_price)}</strong>
           <small>${timeOnly(row.event_at)} · ${direction}</small>
           <small>ATR $${Number(row.atr || 0).toFixed(2)}</small>
+        </td>
+        <td class="price-cell one-minute-cell" data-label="后1分钟">
+          <small>${timeRange(row.event_at, 0, 1)}</small>
+          <strong>${price(row.entry_price)} → ${price(row.price_1)}</strong>
+          <small>最高 ${price(row.high_1)} · 最低 ${price(row.low_1)}</small>
+          <small class="outcome-line ${resultClass(row.return_1)}">${money(row.return_1)} / ${signed(row.return_1_atr, " ATR")}</small>
+          <b class="reversal-state ${row.reversal_1 ? "positive" : "neutral"}">${oneMinuteState}</b>
         </td>
         <td class="price-cell" data-label="5分钟价格">
           <small>${timeRange(row.event_at, 0, 5)}</small>
@@ -272,7 +285,7 @@ function renderAudit(rows) {
         </td>
       </tr>
       <tr id="${chartId}" class="chart-detail-row" hidden>
-        <td class="chart-detail-cell" colspan="6"><div class="chart-host"></div></td>
+        <td class="chart-detail-cell" colspan="7"><div class="chart-host"></div></td>
       </tr>
     `;
   }).join("");

@@ -171,6 +171,7 @@ def build_hypothesis_dashboard(
         path_15 = _continuous_path(by_time, signal["opened_at"], 15)
         if path_5 is None or path_15 is None:
             continue
+        future_1 = path_5[0]
         pre_5 = ordered[index - 4 : index + 1]
         atr = sum(true_ranges[index - ATR_PERIOD + 1 : index + 1]) / ATR_PERIOD
         price_range = float(signal["high"]) - float(signal["low"])
@@ -184,9 +185,11 @@ def build_hypothesis_dashboard(
         )
         signal_direction = 1 if body > 0 else -1 if body < 0 else 0
         entry = float(signal["close"])
+        counter_return_1 = -signal_direction * (float(future_1["close"]) - entry)
         counter_return_5 = -signal_direction * (float(future_5["close"]) - entry)
         counter_return_15 = -signal_direction * (float(future_15["close"]) - entry)
         threshold = REVERSAL_ATR_RATIO * atr
+        reversal_1 = qualified and signal_direction != 0 and counter_return_1 >= threshold
         reversal_5 = qualified and signal_direction != 0 and counter_return_5 >= threshold
         reversal_15 = qualified and signal_direction != 0 and counter_return_15 >= threshold
         minute = event_at.astimezone(SHANGHAI).minute
@@ -211,8 +214,11 @@ def build_hypothesis_dashboard(
                     (entry - float(pre_5[0]["open"])) / atr if atr else 0.0
                 ),
                 "entry_price": entry,
+                "price_1": float(future_1["close"]),
                 "price_5": float(future_5["close"]),
                 "price_15": float(future_15["close"]),
+                "high_1": float(future_1["high"]),
+                "low_1": float(future_1["low"]),
                 "high_5": max(float(candle["high"]) for candle in path_5),
                 "low_5": min(float(candle["low"]) for candle in path_5),
                 "high_15": max(float(candle["high"]) for candle in path_15),
@@ -222,10 +228,13 @@ def build_hypothesis_dashboard(
                 "signal_body_ratio": body_ratio,
                 "atr": atr,
                 "qualified": qualified,
+                "return_1": counter_return_1,
                 "return_5": counter_return_5,
                 "return_15": counter_return_15,
+                "return_1_atr": counter_return_1 / atr if atr else 0.0,
                 "return_5_atr": counter_return_5 / atr if atr else 0.0,
                 "return_15_atr": counter_return_15 / atr if atr else 0.0,
+                "reversal_1": reversal_1,
                 "reversal_5": reversal_5,
                 "reversal_15": reversal_15,
                 "classification": _classification(reversal_5, reversal_15),
@@ -277,7 +286,7 @@ def build_hypothesis_dashboard(
             "anchor_minutes": sorted(ANCHOR_MINUTES),
             "grid_control_minutes": sorted(GRID_CONTROL_MINUTES),
             "signal_minutes": 1,
-            "outcome_minutes": [5, 15],
+            "outcome_minutes": [1, 5, 15],
             "atr_period": ATR_PERIOD,
             "signal_atr_ratio": SIGNAL_ATR_RATIO,
             "signal_body_ratio": SIGNAL_BODY_RATIO,

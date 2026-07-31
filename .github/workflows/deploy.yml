@@ -30,7 +30,6 @@ jobs:
       - name: Verify and test in runner workspace
         run: |
           test "$GITHUB_REF" = "refs/heads/main"
-          bash -n ops/update-xau-tzdata
           python3 -m venv .ci-venv
           .ci-venv/bin/python -m pip install --upgrade pip
           .ci-venv/bin/python -m pip install -e ".[wecom]"
@@ -41,15 +40,6 @@ jobs:
             node --check src/xau_monitor/web_static/auth.js
             node --check src/xau_monitor/web_static/account.js
           fi
-
-      - name: Keep production time zone rules current
-        run: |
-          sudo install -o root -g root -m 0755 ops/update-xau-tzdata /usr/local/sbin/update-xau-tzdata
-          sudo install -o root -g root -m 0644 ops/xau-tzdata-update.service /etc/systemd/system/xau-tzdata-update.service
-          sudo install -o root -g root -m 0644 ops/xau-tzdata-update.timer /etc/systemd/system/xau-tzdata-update.timer
-          sudo systemctl daemon-reload
-          sudo systemctl enable --now xau-tzdata-update.timer
-          sudo /usr/local/sbin/update-xau-tzdata
 
       - name: Deploy with fixed server script
         run: sudo /usr/local/sbin/deploy-xau-monitor "$GITHUB_WORKSPACE" "$GITHUB_SHA"

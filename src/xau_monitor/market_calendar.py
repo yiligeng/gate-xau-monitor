@@ -2,14 +2,19 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from importlib.resources import files
 from typing import Any
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, reset_tzpath
+
+import tzdata
 
 
-SHANGHAI = ZoneInfo("Asia/Shanghai")
-NEW_YORK = ZoneInfo("America/New_York")
-LONDON = ZoneInfo("Europe/London")
-TOKYO = ZoneInfo("Asia/Tokyo")
+TIMEZONE_DATA_VERSION = tzdata.__version__
+reset_tzpath((str(files("tzdata").joinpath("zoneinfo")),))
+SHANGHAI = ZoneInfo.no_cache("Asia/Shanghai")
+NEW_YORK = ZoneInfo.no_cache("America/New_York")
+LONDON = ZoneInfo.no_cache("Europe/London")
+TOKYO = ZoneInfo.no_cache("Asia/Tokyo")
 
 FED_CALENDAR_URL = "https://www.federalreserve.gov/newsevents/calendar.htm"
 BLS_SCHEDULE_URL = "https://www.bls.gov/schedule/2026/home.htm"
@@ -100,6 +105,7 @@ def market_calendar_payload(now: datetime | None = None) -> dict[str, Any]:
     windows = daily_risk_windows(now)
     return {
         "timezone": "Asia/Shanghai",
+        "timezone_data_version": TIMEZONE_DATA_VERSION,
         "date": now.date().isoformat(),
         "generated_at": now.isoformat(),
         "windows": windows,

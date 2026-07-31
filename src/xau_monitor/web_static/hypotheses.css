@@ -314,10 +314,8 @@ tbody tr:hover td { background: #15191b; }
 .price-cell strong { color: var(--text); font-size: 14px; }
 .audit-time small,
 .price-cell small { margin-top: 5px; color: var(--muted); font-size: 11px; }
-.price-cell.positive strong,
-.price-cell.positive small { color: var(--green); }
-.price-cell.negative strong,
-.price-cell.negative small { color: var(--red); }
+.outcome-line.positive { color: var(--green); }
+.outcome-line.negative { color: var(--red); }
 .result-cell { font-weight: 700; }
 
 .research-note {
@@ -371,7 +369,7 @@ tbody tr:hover td { background: #15191b; }
   }
   .audit-table td::before {
     content: attr(data-label);
-    grid-row: 1 / span 2;
+    grid-row: 1 / span 3;
     color: var(--muted);
     font-size: 11px;
   }

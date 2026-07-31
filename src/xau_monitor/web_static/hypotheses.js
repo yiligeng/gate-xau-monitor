@@ -146,13 +146,15 @@ function renderAudit(rows) {
           <strong>${price(row.entry_price)}</strong>
           <small>${direction} · ATR $${Number(row.atr || 0).toFixed(2)}</small>
         </td>
-        <td class="price-cell ${resultClass(row.return_5)}" data-label="5分钟价格">
-          <strong>${price(row.price_5)}</strong>
-          <small>${money(row.return_5)} / ${signed(row.return_5_atr, " ATR")}</small>
+        <td class="price-cell" data-label="5分钟价格">
+          <strong>${price(row.entry_price)} → ${price(row.price_5)}</strong>
+          <small>最高 ${price(row.high_5)} · 最低 ${price(row.low_5)}</small>
+          <small class="outcome-line ${resultClass(row.return_5)}">${money(row.return_5)} / ${signed(row.return_5_atr, " ATR")}</small>
         </td>
-        <td class="price-cell ${resultClass(row.return_15)}" data-label="15分钟价格">
-          <strong>${price(row.price_15)}</strong>
-          <small>${money(row.return_15)} / ${signed(row.return_15_atr, " ATR")}</small>
+        <td class="price-cell" data-label="15分钟价格">
+          <strong>${price(row.entry_price)} → ${price(row.price_15)}</strong>
+          <small>最高 ${price(row.high_15)} · 最低 ${price(row.low_15)}</small>
+          <small class="outcome-line ${resultClass(row.return_15)}">${money(row.return_15)} / ${signed(row.return_15_atr, " ATR")}</small>
         </td>
         <td class="result-cell" data-label="结果">${escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)}</td>
       </tr>

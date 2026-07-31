@@ -5,6 +5,37 @@ from xau_monitor.market_calendar import SHANGHAI, market_calendar_payload
 
 
 class MarketCalendarTests(unittest.TestCase):
+    def test_daily_windows_remain_consistent_across_2026_and_2027(self) -> None:
+        current = datetime(2026, 1, 1, 19, 0, tzinfo=SHANGHAI)
+        end = datetime(2028, 1, 1, 19, 0, tzinfo=SHANGHAI)
+
+        while current < end:
+            payload = market_calendar_payload(current)
+            volatility = {
+                window["title"]: window
+                for window in payload["volatility_windows"]
+            }
+            risk = {window["title"]: window for window in payload["windows"]}
+
+            us_data = volatility["美国数据窗"]
+            london_open = volatility["伦敦盘启动"]
+            us_lunch = risk["美国午饭震荡窗"]
+            uk_lunch = risk["英国午饭震荡窗"]
+
+            self.assertIn(us_data["time_label"], {"20:25-20:45", "21:25-21:45"})
+            self.assertIn(london_open["time_label"], {"15:00-17:00", "16:00-18:00"})
+            self.assertIn(us_lunch["time_label"], {"00:00-01:30", "01:00-02:30"})
+            self.assertIn(uk_lunch["time_label"], {"19:00-20:30", "20:00-21:30"})
+            self.assertEqual(
+                datetime.fromisoformat(us_data["start"]).date(),
+                current.date(),
+            )
+            self.assertEqual(
+                datetime.fromisoformat(us_lunch["start"]).date(),
+                current.date() + timedelta(days=1),
+            )
+            current += timedelta(days=1)
+
     def test_london_and_new_york_windows_follow_dst_independently(self) -> None:
         cases = [
             # Both regions on standard time.

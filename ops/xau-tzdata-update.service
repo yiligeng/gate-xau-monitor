@@ -1,0 +1,11 @@
+[Unit]
+Description=Update time zone rules for XAU market windows
+Wants=network-online.target
+After=network-online.target apt-daily-upgrade.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/update-xau-tzdata
+
+[Install]
+WantedBy=multi-user.target

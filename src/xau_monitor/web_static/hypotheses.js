@@ -56,6 +56,26 @@ function localTime(value) {
   }).format(new Date(value));
 }
 
+function timeOnly(value) {
+  if (!value) return "--";
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(value));
+}
+
+function shiftedTime(value, minutes) {
+  const date = new Date(value);
+  date.setMinutes(date.getMinutes() + minutes);
+  return timeOnly(date);
+}
+
+function timeRange(value, startMinutes, endMinutes) {
+  return `${shiftedTime(value, startMinutes)}–${shiftedTime(value, endMinutes)}`;
+}
+
 function setText(id, value) {
   const target = $(id);
   if (target) target.textContent = value;
@@ -123,43 +143,153 @@ function renderAnchors(rows) {
   `).join("");
 }
 
+function renderCandleChart(row) {
+  const candles = Array.isArray(row.chart_candles) ? row.chart_candles : [];
+  if (!candles.length) return '<p class="chart-empty">这条样本没有完整K线。</p>';
+
+  const width = 960;
+  const height = 290;
+  const left = 62;
+  const right = 22;
+  const top = 34;
+  const bottom = 36;
+  const plotWidth = width - left - right;
+  const plotHeight = height - top - bottom;
+  const high = Math.max(...candles.map((candle) => Number(candle.high)));
+  const low = Math.min(...candles.map((candle) => Number(candle.low)));
+  const padding = Math.max((high - low) * 0.08, 0.01);
+  const chartHigh = high + padding;
+  const chartLow = low - padding;
+  const priceSpan = chartHigh - chartLow;
+  const step = plotWidth / candles.length;
+  const candleWidth = Math.max(5, step * 0.56);
+  const y = (value) => top + ((chartHigh - Number(value)) / priceSpan) * plotHeight;
+  const xBoundary = (relativeMinute) => left + (relativeMinute + 5) * step;
+
+  const grid = Array.from({ length: 5 }, (_item, index) => {
+    const value = chartHigh - (priceSpan * index) / 4;
+    const yValue = y(value);
+    return `
+      <line x1="${left}" y1="${yValue}" x2="${width - right}" y2="${yValue}" class="chart-grid-line" />
+      <text x="${left - 8}" y="${yValue + 4}" class="chart-axis-label" text-anchor="end">${price(value)}</text>
+    `;
+  }).join("");
+
+  const bars = candles.map((candle, index) => {
+    const open = Number(candle.open);
+    const close = Number(candle.close);
+    const x = left + (index + 0.5) * step;
+    const bodyTop = y(Math.max(open, close));
+    const bodyBottom = y(Math.min(open, close));
+    const bodyHeight = Math.max(2, bodyBottom - bodyTop);
+    const className = close >= open ? "up" : "down";
+    const title = `${timeOnly(candle.opened_at)} · 开 ${price(open)} · 高 ${price(candle.high)} · 低 ${price(candle.low)} · 收 ${price(close)}`;
+    return `
+      <g class="candle ${className}">
+        <title>${escapeHtml(title)}</title>
+        <line x1="${x}" y1="${y(candle.high)}" x2="${x}" y2="${y(candle.low)}" />
+        <rect x="${x - candleWidth / 2}" y="${bodyTop}" width="${candleWidth}" height="${bodyHeight}" rx="1" />
+      </g>
+    `;
+  }).join("");
+
+  const entryY = y(row.entry_price);
+  const markers = [
+    { minute: 0, label: "观察点" },
+    { minute: 5, label: "+5分" },
+    { minute: 15, label: "+15分" },
+  ].map((marker) => `
+    <line x1="${xBoundary(marker.minute)}" y1="${top}" x2="${xBoundary(marker.minute)}" y2="${height - bottom}" class="chart-marker" />
+    <text x="${xBoundary(marker.minute)}" y="${height - 12}" class="chart-marker-label" text-anchor="middle">${marker.label}</text>
+  `).join("");
+
+  return `
+    <div class="chart-panel">
+      <div class="chart-summary">
+        <strong>${timeRange(row.event_at, -5, 15)} · 20根一分钟K线</strong>
+        <span>区间最高 ${price(high)} · 最低 ${price(low)}</span>
+      </div>
+      <div class="chart-scroll">
+        <svg class="candle-chart" viewBox="0 0 ${width} ${height}" role="img" aria-label="观察前5分钟至观察后15分钟K线图">
+          ${grid}
+          <line x1="${left}" y1="${entryY}" x2="${width - right}" y2="${entryY}" class="entry-line" />
+          <text x="${width - right}" y="${entryY - 6}" class="entry-label" text-anchor="end">起点 ${price(row.entry_price)}</text>
+          ${markers}
+          ${bars}
+        </svg>
+      </div>
+      <div class="chart-legend">
+        <span><i class="legend-up"></i>上涨K线</span>
+        <span><i class="legend-down"></i>下跌K线</span>
+        <span><i class="legend-entry"></i>观察起点价</span>
+      </div>
+    </div>
+  `;
+}
+
 function renderAudit(rows) {
   const target = $("audit-body");
   if (!rows?.length) {
     target.innerHTML = '<tr><td class="empty-row" colspan="6">还没有走满15分钟的有效样本。</td></tr>';
     return;
   }
-  target.innerHTML = rows.map((row) => {
+  target.innerHTML = rows.map((row, index) => {
     const direction = row.trade_direction === "long" ? "准备做多" : "准备做空";
     const signal = row.signal_direction === "up" ? "上涨" : "下跌";
+    const chartId = `sample-chart-${index}`;
     return `
-      <tr>
+      <tr class="sample-row">
         <td class="audit-time" data-label="观察时点">
           <strong>${escapeHtml(localTime(row.event_at))}</strong>
           <small>${String(row.minute).padStart(2, "0")}分</small>
         </td>
-        <td class="price-cell" data-label="前1分钟">
-          <strong>${price(row.signal_open_price)} → ${price(row.signal_close_price)}</strong>
-          <small>${signal} · ${Number(row.signal_body_atr || 0).toFixed(2)} ATR</small>
+        <td class="price-cell pre-move-cell" data-label="观察前走势">
+          <strong>${timeRange(row.event_at, -5, 0)}</strong>
+          <small>前5分 ${price(row.pre_5_open_price)} → ${price(row.entry_price)}</small>
+          <small>最高 ${price(row.pre_5_high)} · 最低 ${price(row.pre_5_low)}</small>
+          <small>前1分 ${price(row.signal_open_price)} → ${price(row.signal_close_price)} · ${signal} ${Number(row.signal_body_atr || 0).toFixed(2)} ATR</small>
         </td>
         <td class="price-cell" data-label="观察起点">
           <strong>${price(row.entry_price)}</strong>
-          <small>${direction} · ATR $${Number(row.atr || 0).toFixed(2)}</small>
+          <small>${timeOnly(row.event_at)} · ${direction}</small>
+          <small>ATR $${Number(row.atr || 0).toFixed(2)}</small>
         </td>
         <td class="price-cell" data-label="5分钟价格">
+          <small>${timeRange(row.event_at, 0, 5)}</small>
           <strong>${price(row.entry_price)} → ${price(row.price_5)}</strong>
           <small>最高 ${price(row.high_5)} · 最低 ${price(row.low_5)}</small>
           <small class="outcome-line ${resultClass(row.return_5)}">${money(row.return_5)} / ${signed(row.return_5_atr, " ATR")}</small>
         </td>
         <td class="price-cell" data-label="15分钟价格">
+          <small>${timeRange(row.event_at, 0, 15)}</small>
           <strong>${price(row.entry_price)} → ${price(row.price_15)}</strong>
           <small>最高 ${price(row.high_15)} · 最低 ${price(row.low_15)}</small>
           <small class="outcome-line ${resultClass(row.return_15)}">${money(row.return_15)} / ${signed(row.return_15_atr, " ATR")}</small>
         </td>
-        <td class="result-cell" data-label="结果">${escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)}</td>
+        <td class="result-cell" data-label="结果">
+          <strong>${escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)}</strong>
+          <button class="chart-toggle" type="button" data-chart-id="${chartId}" data-row-index="${index}" aria-expanded="false">查看K线</button>
+        </td>
+      </tr>
+      <tr id="${chartId}" class="chart-detail-row" hidden>
+        <td class="chart-detail-cell" colspan="6"><div class="chart-host"></div></td>
       </tr>
     `;
   }).join("");
+  target.querySelectorAll(".chart-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const detail = document.getElementById(button.dataset.chartId);
+      const opening = detail.hidden;
+      detail.hidden = !opening;
+      button.setAttribute("aria-expanded", String(opening));
+      button.textContent = opening ? "收起K线" : "查看K线";
+      const host = detail.querySelector(".chart-host");
+      if (opening && !host.dataset.rendered) {
+        host.innerHTML = renderCandleChart(rows[Number(button.dataset.rowIndex)]);
+        host.dataset.rendered = "true";
+      }
+    });
+  });
 }
 
 function renderCoverage(coverage) {

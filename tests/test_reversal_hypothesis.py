@@ -118,8 +118,15 @@ class ReversalHypothesisTests(unittest.TestCase):
         self.assertAlmostEqual(result["recent"][0]["low_5"], 101.15)
         self.assertAlmostEqual(result["recent"][0]["high_15"], 102.2)
         self.assertAlmostEqual(result["recent"][0]["low_15"], 99.85)
+        self.assertAlmostEqual(result["recent"][0]["pre_5_open_price"], 100.0)
+        self.assertAlmostEqual(result["recent"][0]["pre_5_high"], 102.0)
+        self.assertAlmostEqual(result["recent"][0]["pre_5_low"], 99.5)
         self.assertAlmostEqual(result["recent"][0]["return_5"], 0.65)
         self.assertAlmostEqual(result["recent"][0]["return_15"], 1.95)
+        chart = result["recent"][0]["chart_candles"]
+        self.assertEqual(len(chart), 20)
+        self.assertEqual(chart[0]["relative_minute"], -5)
+        self.assertEqual(chart[-1]["relative_minute"], 14)
         self.assertNotIn("minute_stats", result)
 
     def test_weak_signal_is_candidate_but_not_valid_sample(self) -> None:

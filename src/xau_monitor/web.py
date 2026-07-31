@@ -810,6 +810,13 @@ def make_handler(
                         if event.get("event_at")
                         else None
                     ),
+                    "chart_candles": [
+                        {
+                            **candle,
+                            "opened_at": candle["opened_at"].isoformat(),
+                        }
+                        for candle in event.get("chart_candles", [])
+                    ],
                 }
                 for event in result.get("recent", [])
             ]

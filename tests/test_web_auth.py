@@ -46,7 +46,21 @@ class FakeHypothesisStore:
             "evidence": {"code": "collecting", "label": "采集中"},
             "summary": {},
             "anchors": [],
-            "recent": [{"event_at": now, "minute": 30}],
+            "recent": [
+                {
+                    "event_at": now,
+                    "minute": 30,
+                    "chart_candles": [
+                        {
+                            "opened_at": now,
+                            "open": 4000.0,
+                            "high": 4001.0,
+                            "low": 3999.0,
+                            "close": 4000.5,
+                        }
+                    ],
+                }
+            ],
         }
 
 
@@ -127,6 +141,10 @@ class WebAuthenticationTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["coverage"]["total_candles"], 100)
         self.assertEqual(payload["recent"][0]["minute"], 30)
+        self.assertIsInstance(
+            payload["recent"][0]["chart_candles"][0]["opened_at"],
+            str,
+        )
 
     def test_login_sets_host_only_secure_session_cookie(self) -> None:
         body = json.dumps(

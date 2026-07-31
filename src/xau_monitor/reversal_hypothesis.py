@@ -171,6 +171,7 @@ def build_hypothesis_dashboard(
         path_15 = _continuous_path(by_time, signal["opened_at"], 15)
         if path_5 is None or path_15 is None:
             continue
+        pre_5 = ordered[index - 4 : index + 1]
         atr = sum(true_ranges[index - ATR_PERIOD + 1 : index + 1]) / ATR_PERIOD
         price_range = float(signal["high"]) - float(signal["low"])
         body = float(signal["close"]) - float(signal["open"])
@@ -202,6 +203,13 @@ def build_hypothesis_dashboard(
                 ),
                 "signal_open_price": float(signal["open"]),
                 "signal_close_price": float(signal["close"]),
+                "pre_5_open_price": float(pre_5[0]["open"]),
+                "pre_5_high": max(float(candle["high"]) for candle in pre_5),
+                "pre_5_low": min(float(candle["low"]) for candle in pre_5),
+                "pre_5_change": entry - float(pre_5[0]["open"]),
+                "pre_5_change_atr": (
+                    (entry - float(pre_5[0]["open"])) / atr if atr else 0.0
+                ),
                 "entry_price": entry,
                 "price_5": float(future_5["close"]),
                 "price_15": float(future_15["close"]),
@@ -225,6 +233,19 @@ def build_hypothesis_dashboard(
                 "mae_5": _countertrend_mae(path_5, entry, signal_direction),
                 "mfe_15": _countertrend_mfe(path_15, entry, signal_direction),
                 "mae_15": _countertrend_mae(path_15, entry, signal_direction),
+                "chart_candles": [
+                    {
+                        "opened_at": candle["opened_at"],
+                        "relative_minute": int(
+                            (candle["opened_at"] - event_at).total_seconds() // 60
+                        ),
+                        "open": float(candle["open"]),
+                        "high": float(candle["high"]),
+                        "low": float(candle["low"]),
+                        "close": float(candle["close"]),
+                    }
+                    for candle in pre_5 + path_15
+                ],
             }
         )
 

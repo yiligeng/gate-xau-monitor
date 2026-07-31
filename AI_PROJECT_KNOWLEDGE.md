@@ -1,6 +1,6 @@
 # Gate 行情监控：AI 项目知识库
 
-最后核验：2026-07-28（Asia/Shanghai）
+最后核验：2026-07-31（Asia/Shanghai）
 
 这份文件是下一位 AI 的主入口。目标是让新的对话不需要重新探索 AWS、
 服务器、数据库和代码架构，就能安全接手。
@@ -24,8 +24,8 @@
 当前最重要的事实：
 
 1. XAU/BTC 行情和 `SCALP-1.0-PY` 核心策略已经在 Python 后端。
-2. 数据库保存用户、会话、每日点位告警和 `LEVEL-5X5-V1` 点位试验；
-   `strategy_snapshots` 仍是空表。
+2. 数据库保存用户、会话、每日点位告警、`LEVEL-5X5-V1` 点位试验，以及
+   `HYP-REV-1M-V1` 使用的一分钟K线；`strategy_snapshots` 仍是空表。
 3. 浏览器里的模拟交易日志仍使用 `localStorage`，没有进数据库。
 4. 当前没有 CDN、AWS WAF、IP 黑名单、IP 限流或 Fail2ban。
 5. 不得把任何密码、Cookie、数据库连接串、AWS 凭据或 SSH 私钥写进文档。
@@ -280,6 +280,10 @@ SCALP-1.0-PY
 - `GET /api/snapshot?market=xau|btc`
 - `GET /api/quote?market=xau|btc`
 - `GET /api/stream?market=xau|btc`
+- `GET /hypotheses`
+- `GET /hypotheses.css`
+- `GET /hypotheses.js`
+- `GET /api/hypotheses/reversal?market=xau&days=7|30|90`
 
 未登录网页请求返回 303 到 `/login`；未登录 API 请求返回 JSON HTTP 401。
 
@@ -362,8 +366,10 @@ Schema：`app`
 - `db/migrations/004_point_strategy_trials.sql`
 - `db/migrations/005_strategy_dashboard_indexes.sql`
 - `db/migrations/006_strategy_tick_reconciliation.sql`
+- `db/migrations/007_three_stage_price_alerts.sql`
+- `db/migrations/008_reversal_hypothesis_candles.sql`
 
-当前 schema version：6。
+当前 schema version：8。
 
 表：
 
@@ -373,6 +379,7 @@ Schema：`app`
 - `app.sessions`
 - `app.price_alerts`
 - `app.point_strategy_trials`
+- `app.market_candles_1m`
 
 当前真实持久化内容：
 
@@ -380,12 +387,13 @@ Schema：`app`
 - 有效登录会话
 - 每日点位告警
 - `LEVEL-5X5-V1` 点位策略的初始价、方向、入场、止损、止盈和结果
+- Gate 已收盘一分钟K线，用于 `HYP-REV-1M-V1` 前向验证
 - Schema 版本
 
 当前没有持久化：
 
 - XAU/BTC Tick
-- K 线
+- 5分钟、15分钟和日线K线
 - 技术指标历史
 - 策略信号历史
 - 浏览器模拟交易日志
@@ -423,9 +431,11 @@ Schema：`app`
 | `src/xau_monitor/auth.py` | scrypt 用户认证、数据库会话 |
 | `src/xau_monitor/users.py` | 管理员用户 CLI |
 | `src/xau_monitor/price_alerts.py` | 每日点位、±5 美元试验生命周期与统计 |
+| `src/xau_monitor/reversal_hypothesis.py` | 一分钟K线入库与时点反转猜想统计 |
 | `src/xau_monitor/wecom_bot.py` | 企业微信长连接、指令和主动提醒 |
 | `src/xau_monitor/web.py` | 市场状态、HTTP 路由、鉴权、静态文件 |
 | `src/xau_monitor/web_static/dashboard.*` | 当前仪表盘 |
+| `src/xau_monitor/web_static/hypotheses.*` | `HYP-REV-1M-V1` 策略猜想页 |
 | `src/xau_monitor/web_static/login.html` | 登录页 |
 | `src/xau_monitor/web_static/account.*` | 用户修改凭据 |
 | `db/migrations/` | 只前进的 PostgreSQL 迁移 |
@@ -583,27 +593,11 @@ flowchart LR
   主要依赖 deploy workflow 手动触发和服务器固定脚本。
 - 不要给 self-hosted runner 用户 unrestricted sudo。
 
-### 旧手动 SSH/rsync 同步（应急）
+### 禁止 SSH/rsync 发布
 
-项目当前主发布流程是 `Deploy Production` GitHub Actions。SSH/rsync 只作为
-GitHub Actions 或 runner 故障时的应急方案，使用前必须先确认目标路径和 diff。
-
-```bash
-rsync -az --omit-dir-times \
-  -e "ssh -i <LOCAL_LIGHTSAIL_SSH_KEY_PATH>" \
-  src/ ubuntu@<LIGHTSAIL_PUBLIC_IPV4>:/opt/xau-monitor/src/
-```
-
-数据库迁移和其他文件按明确路径同步。不要使用 `rsync --delete`，除非已经
-检查精确目标并获得明确授权。
-
-服务器安装：
-
-```bash
-/opt/xau-monitor/.venv/bin/python -m pip install -e /opt/xau-monitor
-sudo /opt/xau-monitor/aws/postgresql/bootstrap-local
-sudo systemctl restart xau-monitor
-```
+用户已于 2026-07-31 明确废弃 SSH/rsync 直接同步。代码发布只能使用
+`main` 提交、GitHub push 和手动 `Deploy Production` 流水线。SSH 仅用于
+只读故障排查，不得用于上传、覆盖或发布项目文件。
 
 ### Caddy
 

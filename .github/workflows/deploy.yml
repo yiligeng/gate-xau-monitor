@@ -36,6 +36,9 @@ jobs:
           .ci-venv/bin/python -m unittest discover -s tests
           if command -v node >/dev/null 2>&1; then
             node --check src/xau_monitor/web_static/dashboard.js
+            node --check src/xau_monitor/web_static/hypotheses.js
+            node --check src/xau_monitor/web_static/auth.js
+            node --check src/xau_monitor/web_static/account.js
           fi
 
       - name: Deploy with fixed server script

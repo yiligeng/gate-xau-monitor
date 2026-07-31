@@ -88,14 +88,15 @@ It listens on `127.0.0.1:8765` locally.
   SCRAM-SHA-256 password authentication.
 - The local database and application role are both named `xau_monitor`. The
   role is not a superuser and cannot create databases, roles, or replication.
-  The schema version is `6`, under the `app` schema.
+  The schema version is `8`, under the `app` schema.
 - The database connection string is stored only in
   `/etc/xau-monitor/database.env`, owned by `root:root` with mode `600`.
   Never print, copy, commit, or upload this file or its value.
 - `xau-monitor.service` loads that environment file. Database connectivity and
   a transactional insert/rollback were verified as the `ubuntu` service user.
-  The application does not yet automatically persist market snapshots; the
-  `app.strategy_snapshots` table is prepared for that later feature.
+  The web service persists completed one-minute candles in
+  `app.market_candles_1m` for the `HYP-REV-1M-V1` reversal research page.
+  `app.strategy_snapshots` remains reserved for later strategy snapshots.
 - Database-backed user authentication is enabled. `app.users` stores scrypt
   password hashes and `app.sessions` stores only SHA-256 session token
   digests. The raw password and raw session token are never stored in the

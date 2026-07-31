@@ -1,0 +1,188 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex,nofollow">
+    <meta name="theme-color" content="#0b0d0f">
+    <title>策略猜想 · XAUUSD 黄金监控</title>
+    <link rel="icon" type="image/png" href="/favicon.png">
+    <link rel="stylesheet" href="/hypotheses.css?v=1">
+  </head>
+  <body>
+    <header class="research-topbar">
+      <a class="back-link" href="/" aria-label="返回行情监控">
+        <span aria-hidden="true">←</span>
+        <span>行情监控</span>
+      </a>
+      <div class="research-brand">
+        <span class="brand-mark" aria-hidden="true">Au</span>
+        <div>
+          <small>GATE TRADFI · RESEARCH</small>
+          <strong>策略猜想</strong>
+        </div>
+      </div>
+      <div class="research-actions">
+        <label for="days-filter">观察范围</label>
+        <select id="days-filter">
+          <option value="7">最近7天</option>
+          <option value="30" selected>最近30天</option>
+          <option value="90">最近90天</option>
+        </select>
+        <button id="refresh-button" type="button" aria-label="刷新统计" title="刷新统计">↻</button>
+      </div>
+    </header>
+
+    <main class="research-shell">
+      <section class="hypothesis-intro" aria-labelledby="hypothesis-title">
+        <div>
+          <p>HYP-REV-1M-V1 · ASIA/SHANGHAI</p>
+          <h1 id="hypothesis-title">一分钟冲击后的时点反转</h1>
+          <div class="minute-sequence" aria-label="观察分钟">
+            <span>00</span><span>06</span><span>24</span>
+            <span>30</span><span>36</span><span>54</span>
+          </div>
+        </div>
+        <div id="evidence-status" class="evidence-status collecting">
+          <span>证据状态</span>
+          <strong>读取中</strong>
+          <small id="evidence-note">正在汇总已完成样本</small>
+        </div>
+      </section>
+
+      <section class="rule-band" aria-label="固定验证规则">
+        <div><span>信号</span><strong>目标时点前1分钟完整K线</strong></div>
+        <div><span>有效冲击</span><strong>实体≥0.25 ATR · 实体占比≥60%</strong></div>
+        <div><span>结果</span><strong>目标时点后5分钟 / 15分钟</strong></div>
+        <div><span>反转门槛</span><strong>反向变化≥0.30 ATR</strong></div>
+      </section>
+
+      <section class="metric-grid" aria-label="核心统计">
+        <article class="metric-card primary">
+          <span>有效样本</span>
+          <strong id="sample-count">0</strong>
+          <small id="candidate-count">候选 0</small>
+        </article>
+        <article class="metric-card">
+          <span>5分钟反转率</span>
+          <strong id="rate-5">--</strong>
+          <small id="record-5">0 / 0</small>
+        </article>
+        <article class="metric-card">
+          <span>15分钟反转率</span>
+          <strong id="rate-15">--</strong>
+          <small id="record-15">0 / 0</small>
+        </article>
+        <article class="metric-card">
+          <span>持续反转</span>
+          <strong id="persistent-rate">--</strong>
+          <small id="persistent-count">5分与15分均成立</small>
+        </article>
+        <article class="metric-card comparison">
+          <span>5分钟超额</span>
+          <strong id="lift-5">--</strong>
+          <small>相对12/18/42/48</small>
+        </article>
+        <article class="metric-card comparison">
+          <span>15分钟超额</span>
+          <strong id="lift-15">--</strong>
+          <small>相对12/18/42/48</small>
+        </article>
+      </section>
+
+      <section class="comparison-band" aria-labelledby="comparison-title">
+        <div class="section-title">
+          <div>
+            <p>EXPERIMENT VS CONTROL</p>
+            <h2 id="comparison-title">实验组与同节奏对照组</h2>
+          </div>
+          <small>对照分钟：12、18、42、48</small>
+        </div>
+        <div class="comparison-rows">
+          <div class="comparison-row">
+            <span>5分钟</span>
+            <div class="bar-track"><i id="selected-bar-5" class="selected-bar"></i></div>
+            <strong id="selected-label-5">--</strong>
+            <div class="bar-track"><i id="control-bar-5" class="control-bar"></i></div>
+            <strong id="control-label-5">--</strong>
+          </div>
+          <div class="comparison-row">
+            <span>15分钟</span>
+            <div class="bar-track"><i id="selected-bar-15" class="selected-bar"></i></div>
+            <strong id="selected-label-15">--</strong>
+            <div class="bar-track"><i id="control-bar-15" class="control-bar"></i></div>
+            <strong id="control-label-15">--</strong>
+          </div>
+        </div>
+        <div class="comparison-legend">
+          <span><i class="selected-dot"></i>观察分钟</span>
+          <span><i class="control-dot"></i>同节奏对照</span>
+        </div>
+      </section>
+
+      <section class="minute-section" aria-labelledby="minute-title">
+        <div class="section-title">
+          <div>
+            <p>MINUTE OF HOUR</p>
+            <h2 id="minute-title">每分钟5分钟反转率</h2>
+          </div>
+          <small>颜色越亮，反转率越高；边框标出实验与对照分钟</small>
+        </div>
+        <div id="minute-grid" class="minute-grid" aria-label="60分钟反转率热力图"></div>
+      </section>
+
+      <section class="anchor-section" aria-labelledby="anchor-title">
+        <div class="section-title">
+          <div>
+            <p>ANCHOR BREAKDOWN</p>
+            <h2 id="anchor-title">六个观察时点</h2>
+          </div>
+          <small>收益以信号时ATR归一化，不含点差、滑点和手续费</small>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>分钟</th><th>有效样本</th><th>5分钟反转</th>
+                <th>15分钟反转</th><th>持续反转</th>
+                <th>5分钟平均</th><th>15分钟平均</th>
+              </tr>
+            </thead>
+            <tbody id="anchor-body">
+              <tr><td colspan="7">正在读取统计…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="audit-section" aria-labelledby="audit-title">
+        <div class="section-title">
+          <div>
+            <p>TRIAL AUDIT</p>
+            <h2 id="audit-title">最近有效样本</h2>
+          </div>
+          <small id="coverage-text">K线数据正在积累</small>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>时间</th><th>分钟</th><th>前1分钟</th><th>准备方向</th>
+                <th>5分钟</th><th>15分钟</th><th>分类</th>
+              </tr>
+            </thead>
+            <tbody id="audit-body">
+              <tr><td colspan="7">还没有走满15分钟的有效样本。</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <p class="research-note">
+        本页只验证固定时间规律，不会下单。最新样本必须完整走满15分钟后才进入统计；
+        结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
+      </p>
+    </main>
+    <script src="/hypotheses.js?v=1"></script>
+  </body>
+</html>

@@ -28,6 +28,7 @@ from .indicators import analyze_frame
 from .market_calendar import market_calendar_payload
 from .monitor import Snapshot, fetch_snapshot, overall_bias, short_term_plan
 from .price_alerts import PriceAlertStore, dedupe_levels
+from .reversal_hypothesis import ReversalHypothesisStore
 from .strategy import evaluate_scalp_strategy
 
 
@@ -64,12 +65,14 @@ class MarketState:
         market: dict[str, Any],
         quote_interval: float,
         analysis_interval: float,
+        candle_store: ReversalHypothesisStore | None = None,
     ) -> None:
         self.client = client
         self.symbol = symbol
         self.market = market
         self.quote_interval = max(0.25, quote_interval)
         self.analysis_interval = max(2.0, analysis_interval)
+        self.candle_store = candle_store
         self.snapshot: Snapshot | None = None
         self.volume_proxy: dict[str, Any] | None = None
         self.error: str | None = None
@@ -80,6 +83,7 @@ class MarketState:
         self.quote_event_times: deque[float] = deque(maxlen=120)
         self.price_change_times: deque[float] = deque(maxlen=120)
         self.last_recorded_price: float | None = None
+        self.last_persisted_candle_timestamp: int | None = None
         self.lock = threading.Lock()
         self.stop_event = threading.Event()
 
@@ -103,6 +107,10 @@ class MarketState:
                 self.volume_proxy = volume_proxy
                 self.error = None
                 self.updated_at = time.time()
+            self._persist_one_minute_candles(
+                snapshot.candles.get("1m", []),
+                backfill=True,
+            )
         except Exception as exc:
             with self.lock:
                 self.error = str(exc)
@@ -191,6 +199,7 @@ class MarketState:
                         interval: future.result()
                         for interval, future in futures.items()
                     }
+                self._persist_one_minute_candles(candles.get("1m", []))
                 frames = {
                     interval: analyze_frame(rows, interval)
                     for interval, rows in candles.items()
@@ -210,6 +219,42 @@ class MarketState:
             except Exception as exc:
                 with self.lock:
                     self.error = str(exc)
+
+    def _persist_one_minute_candles(
+        self,
+        candles: list[Any],
+        backfill: bool = False,
+    ) -> None:
+        if self.candle_store is None or not candles:
+            return
+        cutoff = int(time.time()) - 60
+        completed = [
+            candle
+            for candle in candles
+            if int(candle.timestamp) <= cutoff
+            and (
+                backfill
+                or self.last_persisted_candle_timestamp is None
+                or int(candle.timestamp) > self.last_persisted_candle_timestamp
+            )
+        ]
+        if not completed:
+            return
+        try:
+            self.candle_store.upsert_completed_candles(
+                self.market["id"],
+                completed,
+            )
+        except Exception as exc:
+            print(
+                "一分钟K线入库暂不可用："
+                f"market={self.market['id']} error={type(exc).__name__}",
+                flush=True,
+            )
+            return
+        self.last_persisted_candle_timestamp = max(
+            int(candle.timestamp) for candle in completed
+        )
 
     def _fetch_volume_proxy(self) -> dict[str, Any] | None:
         volume_method = getattr(self.client, "volume_proxy", None)
@@ -327,6 +372,7 @@ def make_handler(
     states: dict[str, MarketState],
     auth_store: AuthStore,
     alert_store: PriceAlertStore | None = None,
+    hypothesis_store: ReversalHypothesisStore | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     static_dir = Path(__file__).with_name("web_static")
     content_types = {
@@ -379,6 +425,9 @@ def make_handler(
             if path == "/api/bot/strategy-stats":
                 self._bot_strategy_dashboard_get()
                 return
+            if path == "/api/hypotheses/reversal":
+                self._reversal_hypothesis_get()
+                return
             if path in {"/api/snapshot", "/api/quote"}:
                 payload = state.payload()
                 if path == "/api/quote" and payload.get("ok"):
@@ -400,6 +449,8 @@ def make_handler(
                 filename = "dashboard.html"
             elif path == "/account":
                 filename = "account.html"
+            elif path == "/hypotheses":
+                filename = "hypotheses.html"
             else:
                 filename = path.lstrip("/")
             if filename not in {
@@ -408,6 +459,9 @@ def make_handler(
                 "dashboard.js",
                 "account.html",
                 "account.js",
+                "hypotheses.html",
+                "hypotheses.css",
+                "hypotheses.js",
                 "auth.css",
                 "favicon.png",
                 "apple-touch-icon.png",
@@ -416,6 +470,27 @@ def make_handler(
                 return
 
             self._send_static(filename)
+
+        def _reversal_hypothesis_get(self) -> None:
+            if hypothesis_store is None:
+                self._send_error_json(503, "策略猜想数据库未启用")
+                return
+            query = parse_qs(urlparse(self.path).query)
+            try:
+                market_id = query.get("market", ["xau"])[0]
+                days = int(query.get("days", ["30"])[0])
+                if market_id not in states:
+                    raise ValueError("unknown market")
+                payload = hypothesis_store.dashboard(market_id, days)
+            except (TypeError, ValueError):
+                self._send_error_json(400, "策略猜想筛选参数无效")
+                return
+            except Exception:
+                self._send_error_json(503, "策略猜想统计读取失败")
+                return
+            self._send_json(
+                {"ok": True} | self._serialize_hypothesis_dashboard(payload)
+            )
 
         def do_POST(self) -> None:
             path = urlparse(self.path).path
@@ -713,6 +788,33 @@ def make_handler(
                 },
             }
 
+        def _serialize_hypothesis_dashboard(
+            self,
+            payload: dict[str, Any],
+        ) -> dict[str, Any]:
+            result = dict(payload)
+            generated_at = result.get("generated_at")
+            result["generated_at"] = (
+                generated_at.isoformat() if generated_at else None
+            )
+            coverage = dict(result.get("coverage") or {})
+            for key in ("first_opened_at", "last_opened_at"):
+                value = coverage.get(key)
+                coverage[key] = value.isoformat() if value else None
+            result["coverage"] = coverage
+            result["recent"] = [
+                {
+                    **event,
+                    "event_at": (
+                        event["event_at"].isoformat()
+                        if event.get("event_at")
+                        else None
+                    ),
+                }
+                for event in result.get("recent", [])
+            ]
+            return result
+
         def _login(self) -> None:
             try:
                 payload = self._read_json()
@@ -886,6 +988,9 @@ def make_handler(
                 "login.html",
                 "account.html",
                 "account.js",
+                "hypotheses.html",
+                "hypotheses.css",
+                "hypotheses.js",
                 "auth.css",
                 "auth.js",
                 "favicon.png",
@@ -982,6 +1087,7 @@ def create_market_states(
     symbol: str,
     quote_interval: float,
     analysis_interval: float,
+    candle_store: ReversalHypothesisStore | None = None,
 ) -> dict[str, MarketState]:
     return {
         "xau": MarketState(
@@ -998,6 +1104,7 @@ def create_market_states(
             },
             quote_interval,
             analysis_interval,
+            candle_store,
         ),
         "btc": MarketState(
             GateFuturesClient(timeout=client.timeout),
@@ -1013,6 +1120,7 @@ def create_market_states(
             },
             max(1.0, quote_interval),
             analysis_interval,
+            candle_store,
         ),
     }
 
@@ -1057,10 +1165,18 @@ def run_web_server(
     open_browser: bool,
     enable_wecom_bot: bool = False,
 ) -> int:
-    auth_store = AuthStore(os.environ.get("DATABASE_URL", ""))
+    database_url = os.environ.get("DATABASE_URL", "")
+    auth_store = AuthStore(database_url)
     auth_store.cleanup()
-    alert_store = PriceAlertStore(os.environ.get("DATABASE_URL", ""))
-    states = create_market_states(client, symbol, quote_interval, analysis_interval)
+    alert_store = PriceAlertStore(database_url)
+    hypothesis_store = ReversalHypothesisStore(database_url)
+    states = create_market_states(
+        client,
+        symbol,
+        quote_interval,
+        analysis_interval,
+        hypothesis_store,
+    )
     initialize_market_states(states)
     start_market_workers(states)
 
@@ -1071,7 +1187,7 @@ def run_web_server(
 
     server = DashboardServer(
         (host, port),
-        make_handler(states, auth_store, alert_store),
+        make_handler(states, auth_store, alert_store, hypothesis_store),
     )
     display_host = "127.0.0.1" if host in {"0.0.0.0", "::"} else host
     url = f"http://{display_host}:{port}"

@@ -31,12 +31,37 @@ class FakeAuthStore:
         raise AssertionError("unexpected credentials")
 
 
+class FakeHypothesisStore:
+    def dashboard(self, market, days):
+        now = utc_now()
+        return {
+            "market": market,
+            "days": days,
+            "generated_at": now,
+            "coverage": {
+                "total_candles": 100,
+                "first_opened_at": now,
+                "last_opened_at": now,
+            },
+            "evidence": {"code": "collecting", "label": "采集中"},
+            "summary": {},
+            "anchors": [],
+            "minute_stats": [],
+            "recent": [{"event_at": now, "minute": 30}],
+        }
+
+
 class WebAuthenticationTests(unittest.TestCase):
     def setUp(self) -> None:
         self.auth_store = FakeAuthStore()
+        self.hypothesis_store = FakeHypothesisStore()
         self.server = DashboardServer(
             ("127.0.0.1", 0),
-            make_handler({}, self.auth_store),
+            make_handler(
+                {"xau": object()},
+                self.auth_store,
+                hypothesis_store=self.hypothesis_store,
+            ),
         )
         self.thread = threading.Thread(
             target=self.server.serve_forever,
@@ -71,6 +96,7 @@ class WebAuthenticationTests(unittest.TestCase):
         for path in (
             "/api/snapshot?market=btc",
             "/api/bot/strategy-stats?market=xau&chat_id=test",
+            "/api/hypotheses/reversal?market=xau&days=30",
         ):
             with self.subTest(path=path):
                 self.connection.request("GET", path)
@@ -78,6 +104,30 @@ class WebAuthenticationTests(unittest.TestCase):
                 payload = json.loads(response.read())
                 self.assertEqual(response.status, 401)
                 self.assertFalse(payload["ok"])
+
+    def test_hypothesis_page_and_api_require_and_accept_session(self) -> None:
+        self.connection.request("GET", "/hypotheses")
+        redirect = self.connection.getresponse()
+        self.assertEqual(redirect.status, 303)
+        redirect.read()
+
+        headers = {"Cookie": "__Host-sheshe_session=valid-session"}
+        self.connection.request("GET", "/hypotheses", headers=headers)
+        page = self.connection.getresponse()
+        self.assertEqual(page.status, 200)
+        self.assertIn("策略猜想", page.read().decode("utf-8"))
+
+        self.connection.request(
+            "GET",
+            "/api/hypotheses/reversal?market=xau&days=30",
+            headers=headers,
+        )
+        response = self.connection.getresponse()
+        payload = json.loads(response.read())
+        self.assertEqual(response.status, 200)
+        self.assertTrue(payload["ok"])
+        self.assertEqual(payload["coverage"]["total_candles"], 100)
+        self.assertEqual(payload["recent"][0]["minute"], 30)
 
     def test_login_sets_host_only_secure_session_cookie(self) -> None:
         body = json.dumps(

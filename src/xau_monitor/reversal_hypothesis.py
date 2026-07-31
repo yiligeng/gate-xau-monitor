@@ -382,6 +382,7 @@ def _countertrend_mae(
 def _summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
     qualified = [event for event in events if event["qualified"]]
     sample_count = len(qualified)
+    reversal_1 = sum(bool(event["reversal_1"]) for event in qualified)
     reversal_5 = sum(bool(event["reversal_5"]) for event in qualified)
     reversal_15 = sum(bool(event["reversal_15"]) for event in qualified)
     persistent = sum(event["classification"] == "persistent" for event in qualified)
@@ -391,8 +392,10 @@ def _summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
     return {
         "candidate_count": len(events),
         "sample_count": sample_count,
+        "reversal_1": reversal_1,
         "reversal_5": reversal_5,
         "reversal_15": reversal_15,
+        "reversal_rate_1": _percent(reversal_1, sample_count),
         "reversal_rate_5": _percent(reversal_5, sample_count),
         "reversal_rate_15": _percent(reversal_15, sample_count),
         "persistent": persistent,
@@ -400,6 +403,7 @@ def _summarize(events: list[dict[str, Any]]) -> dict[str, Any]:
         "delayed": delayed,
         "faded": faded,
         "no_reversal": no_reversal,
+        "average_return_1_atr": _average(qualified, "return_1_atr"),
         "average_return_5_atr": _average(qualified, "return_5_atr"),
         "average_return_15_atr": _average(qualified, "return_15_atr"),
         "confidence_5": _wilson_interval(reversal_5, sample_count),

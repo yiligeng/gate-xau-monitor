@@ -103,6 +103,8 @@ class ReversalHypothesisTests(unittest.TestCase):
 
         selected = result["summary"]["selected"]
         self.assertEqual(selected["sample_count"], 1)
+        self.assertEqual(selected["reversal_1"], 0)
+        self.assertEqual(selected["reversal_rate_1"], 0.0)
         self.assertEqual(selected["reversal_5"], 1)
         self.assertEqual(selected["reversal_15"], 1)
         self.assertEqual(selected["persistent"], 1)

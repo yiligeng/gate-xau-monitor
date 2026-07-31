@@ -105,6 +105,8 @@ function renderSummary(data) {
   const control = data.summary?.grid_control || {};
   setText("sample-count", String(selected.sample_count || 0));
   setText("candidate-count", `候选 ${selected.candidate_count || 0}`);
+  setText("rate-1", rate(selected.reversal_rate_1));
+  setText("record-1", `${selected.reversal_1 || 0} / ${selected.sample_count || 0}`);
   setText("rate-5", rate(selected.reversal_rate_5));
   setText("record-5", `${selected.reversal_5 || 0} / ${selected.sample_count || 0}`);
   setText("rate-15", rate(selected.reversal_rate_15));
@@ -127,13 +129,14 @@ function renderSummary(data) {
 function renderAnchors(rows) {
   const target = $("anchor-body");
   if (!rows?.length) {
-    target.innerHTML = '<tr><td colspan="7">还没有可用样本。</td></tr>';
+    target.innerHTML = '<tr><td colspan="8">还没有可用样本。</td></tr>';
     return;
   }
   target.innerHTML = rows.map((row) => `
     <tr>
       <td><strong>${String(row.minute).padStart(2, "0")}</strong></td>
       <td>${row.sample_count || 0}</td>
+      <td>${rate(row.reversal_rate_1)}</td>
       <td>${rate(row.reversal_rate_5)}</td>
       <td>${rate(row.reversal_rate_15)}</td>
       <td>${rate(row.persistent_rate)}</td>

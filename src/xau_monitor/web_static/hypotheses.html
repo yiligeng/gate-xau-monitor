@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0b0d0f">
     <title>策略猜想 · XAUUSD 黄金监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="stylesheet" href="/hypotheses.css?v=5">
+    <link rel="stylesheet" href="/hypotheses.css?v=6">
   </head>
   <body>
     <header class="research-topbar">
@@ -53,7 +53,7 @@
       <section class="rule-band" aria-label="固定验证规则">
         <div><span>信号</span><strong>目标时点前1分钟完整K线</strong></div>
         <div><span>有效冲击</span><strong>实体≥0.25 ATR · 实体占比≥60%</strong></div>
-        <div><span>结果</span><strong>目标时点后5分钟 / 15分钟</strong></div>
+        <div><span>结果</span><strong>目标时点后1分钟 / 5分钟 / 15分钟</strong></div>
         <div><span>反转门槛</span><strong>反向变化≥0.30 ATR</strong></div>
       </section>
 
@@ -62,6 +62,11 @@
           <span>有效样本</span>
           <strong id="sample-count">0</strong>
           <small id="candidate-count">候选 0</small>
+        </article>
+        <article class="metric-card">
+          <span>1分钟反转率</span>
+          <strong id="rate-1">--</strong>
+          <small id="record-1">0 / 0</small>
         </article>
         <article class="metric-card">
           <span>5分钟反转率</span>
@@ -132,13 +137,13 @@
           <table>
             <thead>
               <tr>
-                <th>分钟</th><th>有效样本</th><th>5分钟反转</th>
+                <th>分钟</th><th>有效样本</th><th>1分钟反转</th><th>5分钟反转</th>
                 <th>15分钟反转</th><th>持续反转</th>
                 <th>5分钟平均</th><th>15分钟平均</th>
               </tr>
             </thead>
             <tbody id="anchor-body">
-              <tr><td colspan="7">正在读取统计…</td></tr>
+              <tr><td colspan="8">正在读取统计…</td></tr>
             </tbody>
           </table>
         </div>
@@ -172,6 +177,6 @@
         结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
       </p>
     </main>
-    <script src="/hypotheses.js?v=5"></script>
+    <script src="/hypotheses.js?v=6"></script>
   </body>
 </html>

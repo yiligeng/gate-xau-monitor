@@ -200,7 +200,11 @@ def build_hypothesis_dashboard(
                 "trade_direction": (
                     "short" if signal_direction > 0 else "long" if signal_direction < 0 else None
                 ),
+                "signal_open_price": float(signal["open"]),
+                "signal_close_price": float(signal["close"]),
                 "entry_price": entry,
+                "price_5": float(future_5["close"]),
+                "price_15": float(future_15["close"]),
                 "signal_body": body_abs,
                 "signal_body_atr": body_abs / atr if atr else 0.0,
                 "signal_body_ratio": body_ratio,
@@ -229,11 +233,6 @@ def build_hypothesis_dashboard(
     minute_groups: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for event in events:
         minute_groups[int(event["minute"])].append(event)
-    minute_stats = [
-        {"minute": minute, "group": _minute_group(minute)}
-        | _summarize(minute_groups.get(minute, []))
-        for minute in range(60)
-    ]
     anchors = [
         {"minute": minute}
         | _summarize(minute_groups.get(minute, []))
@@ -268,7 +267,6 @@ def build_hypothesis_dashboard(
             "lift_15": _rate_lift(selected_summary, grid_summary, "reversal_rate_15"),
         },
         "anchors": anchors,
-        "minute_stats": minute_stats,
         "recent": recent,
     }
 

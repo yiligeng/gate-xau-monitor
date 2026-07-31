@@ -25,6 +25,20 @@ function signed(value, suffix = "") {
   return `${value >= 0 ? "+" : ""}${value.toFixed(2)}${suffix}`;
 }
 
+function price(value) {
+  return Number.isFinite(value)
+    ? Number(value).toLocaleString("en-US", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      })
+    : "--";
+}
+
+function money(value) {
+  if (!Number.isFinite(value)) return "--";
+  return `${value >= 0 ? "+" : "-"}$${Math.abs(value).toFixed(2)}`;
+}
+
 function resultClass(value) {
   if (!Number.isFinite(value) || Math.abs(value) < 0.0001) return "neutral";
   return value > 0 ? "positive" : "negative";
@@ -90,25 +104,6 @@ function renderSummary(data) {
   setText("control-label-15", rate(control.reversal_rate_15));
 }
 
-function renderMinuteGrid(rows) {
-  const target = $("minute-grid");
-  target.innerHTML = (rows || []).map((row) => {
-    const value = row.reversal_rate_5;
-    const alpha = Number.isFinite(value) ? 0.08 + (value / 100) * 0.54 : 0;
-    const background = Number.isFinite(value)
-      ? `rgba(50, 210, 150, ${alpha.toFixed(3)})`
-      : "#111416";
-    const minute = String(row.minute).padStart(2, "0");
-    const title = `${minute}分：${rate(value)}，有效样本 ${row.sample_count || 0}`;
-    return `
-      <div class="minute-cell ${escapeHtml(row.group)}" style="background:${background}" title="${escapeHtml(title)}">
-        <strong>${minute}</strong>
-        <small>${rate(value)} · n=${row.sample_count || 0}</small>
-      </div>
-    `;
-  }).join("");
-}
-
 function renderAnchors(rows) {
   const target = $("anchor-body");
   if (!rows?.length) {
@@ -131,7 +126,7 @@ function renderAnchors(rows) {
 function renderAudit(rows) {
   const target = $("audit-body");
   if (!rows?.length) {
-    target.innerHTML = '<tr><td colspan="7">还没有走满15分钟的有效样本。</td></tr>';
+    target.innerHTML = '<tr><td class="empty-row" colspan="6">还没有走满15分钟的有效样本。</td></tr>';
     return;
   }
   target.innerHTML = rows.map((row) => {
@@ -139,13 +134,27 @@ function renderAudit(rows) {
     const signal = row.signal_direction === "up" ? "上涨" : "下跌";
     return `
       <tr>
-        <td>${escapeHtml(localTime(row.event_at))}</td>
-        <td>${String(row.minute).padStart(2, "0")}</td>
-        <td>${signal} · ${Number(row.signal_body_atr || 0).toFixed(2)} ATR</td>
-        <td>${direction}</td>
-        <td class="${resultClass(row.return_5_atr)}">${signed(row.return_5_atr, " ATR")}</td>
-        <td class="${resultClass(row.return_15_atr)}">${signed(row.return_15_atr, " ATR")}</td>
-        <td>${escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)}</td>
+        <td class="audit-time" data-label="观察时点">
+          <strong>${escapeHtml(localTime(row.event_at))}</strong>
+          <small>${String(row.minute).padStart(2, "0")}分</small>
+        </td>
+        <td class="price-cell" data-label="前1分钟">
+          <strong>${price(row.signal_open_price)} → ${price(row.signal_close_price)}</strong>
+          <small>${signal} · ${Number(row.signal_body_atr || 0).toFixed(2)} ATR</small>
+        </td>
+        <td class="price-cell" data-label="观察起点">
+          <strong>${price(row.entry_price)}</strong>
+          <small>${direction} · ATR $${Number(row.atr || 0).toFixed(2)}</small>
+        </td>
+        <td class="price-cell ${resultClass(row.return_5)}" data-label="5分钟价格">
+          <strong>${price(row.price_5)}</strong>
+          <small>${money(row.return_5)} / ${signed(row.return_5_atr, " ATR")}</small>
+        </td>
+        <td class="price-cell ${resultClass(row.return_15)}" data-label="15分钟价格">
+          <strong>${price(row.price_15)}</strong>
+          <small>${money(row.return_15)} / ${signed(row.return_15_atr, " ATR")}</small>
+        </td>
+        <td class="result-cell" data-label="结果">${escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)}</td>
       </tr>
     `;
   }).join("");
@@ -166,7 +175,6 @@ function renderCoverage(coverage) {
 function render(data) {
   renderEvidence(data);
   renderSummary(data);
-  renderMinuteGrid(data.minute_stats);
   renderAnchors(data.anchors);
   renderAudit(data.recent);
   renderCoverage(data.coverage);

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0b0d0f">
     <title>策略猜想 · XAUUSD 黄金监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="stylesheet" href="/hypotheses.css?v=1">
+    <link rel="stylesheet" href="/hypotheses.css?v=2">
   </head>
   <body>
     <header class="research-topbar">
@@ -120,17 +120,6 @@
         </div>
       </section>
 
-      <section class="minute-section" aria-labelledby="minute-title">
-        <div class="section-title">
-          <div>
-            <p>MINUTE OF HOUR</p>
-            <h2 id="minute-title">每分钟5分钟反转率</h2>
-          </div>
-          <small>颜色越亮，反转率越高；边框标出实验与对照分钟</small>
-        </div>
-        <div id="minute-grid" class="minute-grid" aria-label="60分钟反转率热力图"></div>
-      </section>
-
       <section class="anchor-section" aria-labelledby="anchor-title">
         <div class="section-title">
           <div>
@@ -164,15 +153,15 @@
           <small id="coverage-text">K线数据正在积累</small>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="audit-table">
             <thead>
               <tr>
-                <th>时间</th><th>分钟</th><th>前1分钟</th><th>准备方向</th>
-                <th>5分钟</th><th>15分钟</th><th>分类</th>
+                <th>观察时点</th><th>前1分钟价格</th><th>观察起点</th>
+                <th>5分钟价格</th><th>15分钟价格</th><th>结果</th>
               </tr>
             </thead>
             <tbody id="audit-body">
-              <tr><td colspan="7">还没有走满15分钟的有效样本。</td></tr>
+              <tr><td class="empty-row" colspan="6">还没有走满15分钟的有效样本。</td></tr>
             </tbody>
           </table>
         </div>
@@ -183,6 +172,6 @@
         结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
       </p>
     </main>
-    <script src="/hypotheses.js?v=1"></script>
+    <script src="/hypotheses.js?v=2"></script>
   </body>
 </html>

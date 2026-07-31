@@ -46,7 +46,6 @@ class FakeHypothesisStore:
             "evidence": {"code": "collecting", "label": "采集中"},
             "summary": {},
             "anchors": [],
-            "minute_stats": [],
             "recent": [{"event_at": now, "minute": 30}],
         }
 

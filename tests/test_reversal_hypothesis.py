@@ -109,6 +109,14 @@ class ReversalHypothesisTests(unittest.TestCase):
         self.assertEqual(result["recent"][0]["minute"], 30)
         self.assertEqual(result["recent"][0]["trade_direction"], "short")
         self.assertEqual(result["recent"][0]["classification"], "persistent")
+        self.assertEqual(result["recent"][0]["signal_open_price"], 100.0)
+        self.assertEqual(result["recent"][0]["signal_close_price"], 102.0)
+        self.assertEqual(result["recent"][0]["entry_price"], 102.0)
+        self.assertAlmostEqual(result["recent"][0]["price_5"], 101.35)
+        self.assertAlmostEqual(result["recent"][0]["price_15"], 100.05)
+        self.assertAlmostEqual(result["recent"][0]["return_5"], 0.65)
+        self.assertAlmostEqual(result["recent"][0]["return_15"], 1.95)
+        self.assertNotIn("minute_stats", result)
 
     def test_weak_signal_is_candidate_but_not_valid_sample(self) -> None:
         start = datetime(2026, 7, 31, 2, 0, tzinfo=timezone.utc)

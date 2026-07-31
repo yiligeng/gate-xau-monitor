@@ -303,6 +303,29 @@ tbody tr:hover td { background: #15191b; }
 .negative { color: var(--red); }
 .neutral { color: var(--muted); }
 
+.price-toggle {
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--gold-soft);
+  background: transparent;
+  cursor: pointer;
+}
+.price-toggle:hover,
+.price-toggle:focus-visible { border-color: var(--gold); }
+.anchor-detail-row[hidden] { display: none; }
+.anchor-detail-row > td { padding: 0; background: #0d1012; }
+.anchor-price-panel { padding: 16px; }
+.anchor-price-title { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.anchor-price-title small { color: var(--muted); }
+.anchor-price-scroll { margin-top: 12px; overflow-x: auto; border: 1px solid var(--line); }
+.anchor-price-table { min-width: 940px; }
+.anchor-price-table th,
+.anchor-price-table td { text-align: left; }
+.anchor-outcome strong,
+.anchor-outcome small { display: block; }
+.anchor-outcome small { margin-top: 4px; font-size: 11px; }
+
 .audit-table { min-width: 1440px; }
 .audit-table th,
 .audit-table td { text-align: left; vertical-align: middle; }

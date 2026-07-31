@@ -267,11 +267,15 @@ def build_hypothesis_dashboard(
     minute_groups: dict[int, list[dict[str, Any]]] = defaultdict(list)
     for event in events:
         minute_groups[int(event["minute"])].append(event)
-    anchors = [
-        {"minute": minute}
-        | _summarize(minute_groups.get(minute, []))
-        for minute in sorted(ANCHOR_MINUTES)
-    ]
+    anchors = []
+    for minute in sorted(ANCHOR_MINUTES):
+        minute_events = minute_groups.get(minute, [])
+        samples = [event for event in reversed(minute_events) if event["qualified"]]
+        anchors.append(
+            {"minute": minute}
+            | _summarize(minute_events)
+            | {"samples": [_anchor_sample(event) for event in samples[:100]]}
+        )
     recent = [
         _serialize_event(event)
         for event in reversed(selected)
@@ -478,4 +482,21 @@ def _serialize_event(event: dict[str, Any]) -> dict[str, Any]:
         key: value
         for key, value in event.items()
         if key not in {"qualified", "group"}
+    }
+
+
+def _anchor_sample(event: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "event_at": event["event_at"],
+        "trade_direction": event["trade_direction"],
+        "entry_price": event["entry_price"],
+        "price_1": event["price_1"],
+        "price_5": event["price_5"],
+        "price_15": event["price_15"],
+        "return_1_atr": event["return_1_atr"],
+        "return_5_atr": event["return_5_atr"],
+        "return_15_atr": event["return_15_atr"],
+        "reversal_1": event["reversal_1"],
+        "reversal_5": event["reversal_5"],
+        "reversal_15": event["reversal_15"],
     }

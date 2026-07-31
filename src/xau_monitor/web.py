@@ -802,6 +802,19 @@ def make_handler(
                 value = coverage.get(key)
                 coverage[key] = value.isoformat() if value else None
             result["coverage"] = coverage
+            result["anchors"] = [
+                {
+                    **anchor,
+                    "samples": [
+                        {
+                            **sample,
+                            "event_at": sample["event_at"].isoformat(),
+                        }
+                        for sample in anchor.get("samples", [])
+                    ],
+                }
+                for anchor in result.get("anchors", [])
+            ]
             result["recent"] = [
                 {
                     **event,

@@ -129,11 +129,26 @@ function renderSummary(data) {
 function renderAnchors(rows) {
   const target = $("anchor-body");
   if (!rows?.length) {
-    target.innerHTML = '<tr><td colspan="8">还没有可用样本。</td></tr>';
+    target.innerHTML = '<tr><td colspan="9">还没有可用样本。</td></tr>';
     return;
   }
-  target.innerHTML = rows.map((row) => `
-    <tr>
+  target.innerHTML = rows.map((row, index) => {
+    const samples = Array.isArray(row.samples) ? row.samples : [];
+    const detailId = `anchor-prices-${index}`;
+    const sampleRows = samples.length
+      ? samples.map((sample) => `
+          <tr>
+            <td>${escapeHtml(localTime(sample.event_at))}</td>
+            <td>${sample.trade_direction === "long" ? "准备做多" : "准备做空"}</td>
+            <td><strong>${price(sample.entry_price)}</strong></td>
+            ${anchorOutcome(sample, 1)}
+            ${anchorOutcome(sample, 5)}
+            ${anchorOutcome(sample, 15)}
+          </tr>
+        `).join("")
+      : '<tr><td colspan="6">该分钟还没有有效样本。</td></tr>';
+    return `
+    <tr class="anchor-row">
       <td><strong>${String(row.minute).padStart(2, "0")}</strong></td>
       <td>${row.sample_count || 0}</td>
       <td>${rate(row.reversal_rate_1)}</td>
@@ -142,8 +157,44 @@ function renderAnchors(rows) {
       <td>${rate(row.persistent_rate)}</td>
       <td class="${resultClass(row.average_return_5_atr)}">${signed(row.average_return_5_atr, " ATR")}</td>
       <td class="${resultClass(row.average_return_15_atr)}">${signed(row.average_return_15_atr, " ATR")}</td>
+      <td><button class="price-toggle" type="button" data-detail-id="${detailId}" aria-expanded="false">查看价格</button></td>
     </tr>
-  `).join("");
+    <tr id="${detailId}" class="anchor-detail-row" hidden>
+      <td colspan="9">
+        <div class="anchor-price-panel">
+          <div class="anchor-price-title"><strong>${String(row.minute).padStart(2, "0")}分有效样本</strong><small>观察起点 → 对应时段收盘价</small></div>
+          <div class="anchor-price-scroll">
+            <table class="anchor-price-table">
+              <thead><tr><th>观察时点</th><th>方向</th><th>观察起点</th><th>后1分钟</th><th>后5分钟</th><th>后15分钟</th></tr></thead>
+              <tbody>${sampleRows}</tbody>
+            </table>
+          </div>
+        </div>
+      </td>
+    </tr>
+  `;
+  }).join("");
+  target.querySelectorAll(".price-toggle").forEach((button) => {
+    button.addEventListener("click", () => {
+      const detail = document.getElementById(button.dataset.detailId);
+      const opening = detail.hidden;
+      detail.hidden = !opening;
+      button.setAttribute("aria-expanded", String(opening));
+      button.textContent = opening ? "收起价格" : "查看价格";
+    });
+  });
+}
+
+function anchorOutcome(sample, minutes) {
+  const reversed = Boolean(sample[`reversal_${minutes}`]);
+  const result = Number(sample[`return_${minutes}_atr`]);
+  const state = reversed ? "已反转" : result > 0 ? "反向未达标" : "未反转";
+  return `
+    <td class="anchor-outcome ${reversed ? "positive" : "neutral"}">
+      <strong>${price(sample.entry_price)} → ${price(sample[`price_${minutes}`])}</strong>
+      <small>${state} · ${signed(result, " ATR")}</small>
+    </td>
+  `;
 }
 
 function renderCandleChart(row) {

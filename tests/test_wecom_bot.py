@@ -1,7 +1,9 @@
 import unittest
+from datetime import datetime, timezone
 
 from xau_monitor.api import Candle
 from xau_monitor.price_alerts import (
+    AlertNotification,
     alert_stage,
     build_point_strategy_plan,
     decode_trial_cursor,
@@ -19,6 +21,7 @@ from xau_monitor.price_alerts import (
 from xau_monitor.wecom_bot import (
     _handle_alert_command,
     extract_chat_id,
+    format_alert_notification,
     format_market_reply,
     format_strategy_stats,
     help_message,
@@ -120,6 +123,46 @@ class WeComBotFormatterTests(unittest.TestCase):
         self.assertIn("XAUUSD 黄金 CFD", reply)
         self.assertIn("最新：4,000.12", reply)
         self.assertIn("只读监控", reply)
+
+    def test_alert_notification_shows_prepare_long_direction(self) -> None:
+        reply = format_alert_notification(
+            AlertNotification(
+                id=1,
+                chat_id="group1",
+                market="xau",
+                level=4087.04,
+                price=4087.13,
+                distance=0.09,
+                alerts_sent=3,
+                alert_limit=3,
+                expires_at=datetime.now(timezone.utc),
+                event="breached",
+                stage=3,
+                direction="long",
+            )
+        )
+
+        self.assertIn("方向提醒：准备做多", reply)
+
+    def test_alert_notification_shows_prepare_short_direction(self) -> None:
+        reply = format_alert_notification(
+            AlertNotification(
+                id=2,
+                chat_id="group1",
+                market="xau",
+                level=4100.0,
+                price=4100.12,
+                distance=0.12,
+                alerts_sent=3,
+                alert_limit=3,
+                expires_at=datetime.now(timezone.utc),
+                event="breached",
+                stage=3,
+                direction="short",
+            )
+        )
+
+        self.assertIn("方向提醒：准备做空", reply)
 
     def test_extracts_chat_id_from_common_locations(self) -> None:
         self.assertEqual(extract_chat_id({"body": {"chatid": "group1"}}), "group1")

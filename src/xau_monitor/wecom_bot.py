@@ -389,17 +389,23 @@ def format_alert_notification(notification: AlertNotification) -> str:
     else:
         title = f"**{market_display_name(notification.market)} 点位一级提醒**"
         status = "距离目标位 <= 3 美元；若未触达并远离，一级提醒次数会恢复。"
-    return "\n".join(
+    lines = [
+        title,
+        f"当前价：{notification.price:,.2f}",
+        f"目标位：{notification.level:,.2f}",
+    ]
+    if notification.direction in {"long", "short"}:
+        direction = "做多" if notification.direction == "long" else "做空"
+        lines.append(f"方向提醒：准备{direction}")
+    lines.extend(
         [
-            title,
-            f"当前价：{notification.price:,.2f}",
-            f"目标位：{notification.level:,.2f}",
             f"距离：{notification.distance:.2f}",
             f"提醒次数：{notification.alerts_sent}/{notification.alert_limit}",
             status,
             "±5点策略会继续跟踪到止盈或止损。",
         ]
     )
+    return "\n".join(lines)
 
 
 def _require_wecom_config() -> tuple[str, str]:

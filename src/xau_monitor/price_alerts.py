@@ -69,6 +69,7 @@ class AlertNotification:
     expires_at: datetime
     event: str
     stage: int
+    direction: str | None = None
 
 
 class PriceAlertStore:
@@ -1008,6 +1009,7 @@ class PriceAlertStore:
                                 expires_at=alert_row[5],
                                 event="breached",
                                 stage=int(alert_row[4]),
+                                direction=trial["direction"],
                             )
                         )
                 result[
@@ -1057,7 +1059,8 @@ class PriceAlertStore:
                        COALESCE(
                            trial.trigger_observed_price,
                            trial.entry_price
-                       ) AS trigger_price
+                       ) AS trigger_price,
+                       trial.direction
                 FROM app.price_alerts AS alert
                 JOIN app.point_strategy_trials AS trial
                   ON trial.price_alert_id = alert.id
@@ -1086,6 +1089,7 @@ class PriceAlertStore:
                         expires_at=row[5],
                         event="breached",
                         stage=final_stage,
+                        direction=str(row[7]),
                     )
                 )
             rows = connection.execute(
@@ -1143,6 +1147,7 @@ class PriceAlertStore:
                             expires_at=alert["expires_at"],
                             event="breached",
                             stage=final_stage,
+                            direction=direction_for_side(alert["side"]),
                         )
                     )
                     continue
@@ -1175,6 +1180,7 @@ class PriceAlertStore:
                         expires_at=alert["expires_at"],
                         event="approach",
                         stage=stage,
+                        direction=direction_for_side(alert["side"]),
                     )
                 )
             open_rows = connection.execute(
@@ -1585,6 +1591,14 @@ def side_for_level(current_price: float, level: float) -> str:
     if level < current_price:
         return "below"
     return "at"
+
+
+def direction_for_side(side: str) -> str | None:
+    if side == "below":
+        return "long"
+    if side == "above":
+        return "short"
+    return None
 
 
 def is_breached(alert: dict[str, Any], current_price: float) -> bool:

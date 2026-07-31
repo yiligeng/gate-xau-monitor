@@ -2603,12 +2603,7 @@ function render(data) {
   latestPayload = data;
   const tone = ticker.change_percent > 0 ? "up" : ticker.change_percent < 0 ? "down" : "neutral";
 
-  setText(
-    "market-status",
-    ticker.status === "open" || ticker.status === "trading"
-      ? "市场交易中"
-      : ticker.status,
-  );
+  setText("market-status", marketStatusText(ticker, data.feed?.source_age_ms));
   setText("updated-time", new Date(ticker.timestamp_ms).toLocaleTimeString("zh-CN", { hour12: false }));
   setText("feed-latency", `接口 ${data.feed.latency_ms.toFixed(0)} ms`);
   setText("frequency-badge", `EDGE · ${data.feed.quote_hz.toFixed(1)} Hz`);
@@ -2641,6 +2636,36 @@ function render(data) {
   drawSelectedChart(data);
 
   renderKeyLevelViews(data);
+}
+
+function marketStatusText(ticker, sourceAgeMs) {
+  const status = String(ticker?.status || "").toLowerCase();
+  if (status === "closed") {
+    const nextOpen = Number(ticker.next_open_time || 0);
+    return nextOpen > 0
+      ? `市场休市 · ${sessionTime(nextOpen)}开市`
+      : "市场休市";
+  }
+  if (status === "open" || status === "trading") {
+    if (Number(ticker.trade_mode) === 0) return "暂不可交易";
+    if (Number(sourceAgeMs) > 120000) return "行情停滞";
+    const closeTime = Number(ticker.close_time || 0);
+    return closeTime > Date.now() / 1000
+      ? `市场交易中 · ${sessionTime(closeTime)}闭市`
+      : "市场交易中";
+  }
+  return status ? `市场状态：${status}` : "市场状态未知";
+}
+
+function sessionTime(timestampSeconds) {
+  return new Intl.DateTimeFormat("zh-CN", {
+    timeZone: "Asia/Shanghai",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date(Number(timestampSeconds) * 1000));
 }
 
 async function refresh() {

@@ -27,6 +27,10 @@ class Ticker:
     previous_close: float
     change_percent: float
     status: str
+    close_time: int = 0
+    open_time: int = 0
+    next_open_time: int = 0
+    trade_mode: int = 4
 
     @property
     def spread(self) -> float:
@@ -441,6 +445,10 @@ def ticker_from_payload(payload: dict[str, Any]) -> Ticker:
         previous_close=float(data["last_today_close_price"]),
         change_percent=float(data["price_change"]),
         status=str(data["status"]),
+        close_time=int(data.get("close_time") or 0),
+        open_time=int(data.get("open_time") or 0),
+        next_open_time=int(data.get("next_open_time") or 0),
+        trade_mode=int(data.get("trade_mode") or 0),
     )
 
 

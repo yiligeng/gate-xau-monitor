@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import patch
 
-from xau_monitor.api import GateFuturesClient, GateTradFiClient
+from xau_monitor.api import GateFuturesClient, GateTradFiClient, ticker_from_payload
 
 
 class StubFuturesClient(GateFuturesClient):
@@ -99,6 +99,32 @@ class TradFiVolumeProxyTests(unittest.TestCase):
         self.assertAlmostEqual(market["sell_quote_60s"], 20)
         self.assertAlmostEqual(market["delta_percent"], 100 / 3)
         self.assertAlmostEqual(market["freshness_ms"], 200)
+
+    def test_ticker_keeps_official_market_session_fields(self) -> None:
+        ticker = ticker_from_payload(
+            {
+                "timestamp": 1_000_000,
+                "data": {
+                    "last_price": "4050.2",
+                    "bid_price": "4050.1",
+                    "ask_price": "4050.3",
+                    "highest_price": "4100",
+                    "lowest_price": "4000",
+                    "today_open_price": "4075",
+                    "last_today_close_price": "4070",
+                    "price_change": "-0.5",
+                    "status": "closed",
+                    "close_time": 1_700_000_000,
+                    "open_time": 1_699_900_000,
+                    "next_open_time": 1_700_200_000,
+                    "trade_mode": "0",
+                },
+            }
+        )
+
+        self.assertEqual(ticker.status, "closed")
+        self.assertEqual(ticker.next_open_time, 1_700_200_000)
+        self.assertEqual(ticker.trade_mode, 0)
 
 
 if __name__ == "__main__":

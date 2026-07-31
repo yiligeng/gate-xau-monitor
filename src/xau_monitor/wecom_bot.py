@@ -92,6 +92,7 @@ def format_market_reply(payload: dict[str, Any]) -> str:
     lines = [
         f"**{market['display_name']}**",
         f"时间：{updated_at:%H:%M:%S}",
+        f"市场：{market_session_text(ticker)}",
         (
             f"最新：{_money(ticker.get('last'))}  "
             f"买/卖：{_money(ticker.get('bid'))}/{_money(ticker.get('ask'))}  "
@@ -137,6 +138,26 @@ def format_market_reply(payload: dict[str, Any]) -> str:
         "只读监控，不构成交易建议。"
     )
     return "\n".join(lines)
+
+
+def market_session_text(ticker: dict[str, Any]) -> str:
+    status = str(ticker.get("status", "")).lower()
+    trade_mode = int(ticker.get("trade_mode", 4) or 0)
+    if status == "closed":
+        next_open = int(ticker.get("next_open_time") or 0)
+        if next_open:
+            opened_at = datetime.fromtimestamp(next_open, tz=SHANGHAI)
+            return f"休市中，预计 {opened_at:%m/%d %H:%M} 开市"
+        return "休市中"
+    if status in {"open", "trading"} and trade_mode != 0:
+        close_time = int(ticker.get("close_time") or 0)
+        if close_time:
+            closed_at = datetime.fromtimestamp(close_time, tz=SHANGHAI)
+            return f"交易中，预计 {closed_at:%m/%d %H:%M} 闭市"
+        return "交易中"
+    if trade_mode == 0:
+        return "暂不可交易"
+    return status or "未知"
 
 
 def market_display_name(market_id: str) -> str:
@@ -418,6 +439,15 @@ def _require_wecom_config() -> tuple[str, str]:
     return bot_id, secret
 
 
+def market_accepts_alerts(payload: dict[str, Any]) -> bool:
+    if not payload.get("ok"):
+        return False
+    ticker = payload.get("ticker", {})
+    status = str(ticker.get("status", "")).lower()
+    trade_mode = int(ticker.get("trade_mode", 4) or 0)
+    return status in {"open", "trading"} and trade_mode != 0
+
+
 def run_wecom_bot(states: dict[str, MarketState]) -> None:
     bot_id, secret = _require_wecom_config()
     database_url = os.environ.get("DATABASE_URL", "").strip()
@@ -472,6 +502,8 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
                     payload = state.payload()
                     if not payload.get("ok"):
                         continue
+                    if not market_accepts_alerts(payload):
+                        continue
                     sequence = int(payload.get("feed", {}).get("sequence") or 0)
                     if last_sequences.get(market_id) == sequence:
                         continue
@@ -524,6 +556,10 @@ def run_wecom_bot(states: dict[str, MarketState]) -> None:
         consecutive_errors = 0
         while True:
             try:
+                xau_state = states.get("xau")
+                if xau_state is None or not market_accepts_alerts(xau_state.payload()):
+                    await asyncio.sleep(5.0)
+                    continue
                 candles = await asyncio.to_thread(
                     candle_client.candles,
                     "XAUUSD",

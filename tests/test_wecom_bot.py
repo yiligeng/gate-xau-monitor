@@ -25,6 +25,8 @@ from xau_monitor.wecom_bot import (
     format_market_reply,
     format_strategy_stats,
     help_message,
+    market_accepts_alerts,
+    market_session_text,
     select_market_id,
 )
 
@@ -61,6 +63,32 @@ class FakeAlertStore:
 
 
 class WeComBotFormatterTests(unittest.TestCase):
+    def test_market_alerts_pause_while_officially_closed(self) -> None:
+        self.assertTrue(
+            market_accepts_alerts({"ok": True, "ticker": {"status": "open"}})
+        )
+        self.assertFalse(
+            market_accepts_alerts({"ok": True, "ticker": {"status": "closed"}})
+        )
+        self.assertFalse(
+            market_accepts_alerts(
+                {"ok": True, "ticker": {"status": "open", "trade_mode": 0}}
+            )
+        )
+        self.assertFalse(market_accepts_alerts({"ok": False}))
+
+    def test_market_session_text_shows_next_open(self) -> None:
+        text = market_session_text(
+            {
+                "status": "closed",
+                "trade_mode": 0,
+                "next_open_time": 1_780_000_000,
+            }
+        )
+
+        self.assertIn("休市中", text)
+        self.assertIn("开市", text)
+
     def test_selects_market_from_text(self) -> None:
         self.assertEqual(select_market_id("看一下BTC"), "btc")
         self.assertEqual(select_market_id("黄金现在怎样"), "xau")

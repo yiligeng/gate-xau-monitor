@@ -533,11 +533,9 @@ def _window_from_new_york(
 
 
 def _new_york_day_for_local_session(local_day: date) -> date:
-    return datetime.combine(
-        local_day,
-        time(12, 0),
-        SHANGHAI,
-    ).astimezone(NEW_YORK).date()
+    # A Beijing session day covers New York morning through its evening,
+    # including windows that appear after midnight in Beijing.
+    return local_day
 
 
 def _window_from_london(

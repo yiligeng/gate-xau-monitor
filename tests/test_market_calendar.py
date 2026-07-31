@@ -1,10 +1,56 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from xau_monitor.market_calendar import SHANGHAI, market_calendar_payload
 
 
 class MarketCalendarTests(unittest.TestCase):
+    def test_london_and_new_york_windows_follow_dst_independently(self) -> None:
+        cases = [
+            # Both regions on standard time.
+            ((2026, 1, 15), "21:25-21:45", "16:00-18:00"),
+            # U.S. switched first; U.K. still on standard time.
+            ((2026, 3, 20), "20:25-20:45", "16:00-18:00"),
+            # Both regions on daylight time.
+            ((2026, 4, 15), "20:25-20:45", "15:00-17:00"),
+            # U.K. switched back first; U.S. still on daylight time.
+            ((2026, 10, 29), "20:25-20:45", "16:00-18:00"),
+            # Both regions back on standard time.
+            ((2026, 11, 3), "21:25-21:45", "16:00-18:00"),
+        ]
+        for (year, month, day), us_time, london_time in cases:
+            with self.subTest(date=f"{year}-{month:02}-{day:02}"):
+                payload = market_calendar_payload(
+                    datetime(year, month, day, 19, 0, tzinfo=SHANGHAI)
+                )
+                windows = {
+                    window["title"]: window
+                    for window in payload["volatility_windows"]
+                }
+                risk_windows = {
+                    window["title"]: window for window in payload["windows"]
+                }
+
+                self.assertEqual(windows["美国数据窗"]["time_label"], us_time)
+                self.assertEqual(windows["伦敦盘启动"]["time_label"], london_time)
+                self.assertEqual(
+                    datetime.fromisoformat(windows["美国数据窗"]["start"]).date(),
+                    datetime(year, month, day).date(),
+                )
+                expected_lunch = (
+                    "01:00-02:30" if us_time.startswith("21:25") else "00:00-01:30"
+                )
+                self.assertEqual(
+                    risk_windows["美国午饭震荡窗"]["time_label"],
+                    expected_lunch,
+                )
+                self.assertEqual(
+                    datetime.fromisoformat(
+                        risk_windows["美国午饭震荡窗"]["start"]
+                    ).date(),
+                    datetime(year, month, day).date() + timedelta(days=1),
+                )
+
     def test_includes_fomc_overnight_for_beijing_day(self) -> None:
         payload = market_calendar_payload(
             datetime(2026, 7, 29, 12, 0, tzinfo=SHANGHAI)

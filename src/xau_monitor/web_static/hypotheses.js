@@ -151,9 +151,9 @@ function averageOutcome(row, minutes) {
   const dollarResult = row[`average_return_${minutes}`];
   const atrResult = row[`average_return_${minutes}_atr`];
   return `
-    <td class="average-outcome ${resultClass(dollarResult)}">
-      <strong>${money(dollarResult)}</strong>
-      <small>${signed(atrResult, " ATR")}</small>
+    <td class="average-outcome">
+      <strong class="${resultClass(dollarResult)}">${money(dollarResult)}</strong>
+      <small class="${resultClass(atrResult)}">${signed(atrResult, " ATR")}</small>
     </td>
   `;
 }

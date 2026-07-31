@@ -4,6 +4,7 @@ from types import SimpleNamespace
 
 from xau_monitor.reversal_hypothesis import (
     ReversalHypothesisStore,
+    _true_ranges,
     build_hypothesis_dashboard,
 )
 
@@ -192,6 +193,39 @@ class ReversalHypothesisTests(unittest.TestCase):
         )
 
         self.assertEqual(minute_30["candidate_count"], 0)
+
+    def test_session_reopen_gap_does_not_inflate_atr(self) -> None:
+        start = datetime(2026, 7, 31, 1, 0, tzinfo=timezone.utc)
+        candles = []
+        for index in range(20):
+            opened_at = start + timedelta(minutes=index)
+            candles.append(
+                {
+                    "opened_at": opened_at,
+                    "open": 100.0,
+                    "high": 100.5,
+                    "low": 99.5,
+                    "close": 100.0,
+                }
+            )
+        reopen = start + timedelta(days=2)
+        for index in range(30):
+            opened_at = reopen + timedelta(minutes=index)
+            candles.append(
+                {
+                    "opened_at": opened_at,
+                    "open": 120.0,
+                    "high": 120.5,
+                    "low": 119.5,
+                    "close": 120.0,
+                }
+            )
+
+        ranges = _true_ranges(candles)
+
+        self.assertAlmostEqual(ranges[19], 1.0)
+        self.assertAlmostEqual(ranges[20], 1.0)
+        self.assertNotAlmostEqual(ranges[20], 20.5)
 
     def test_flat_signal_is_not_qualified(self) -> None:
         start = datetime(2026, 7, 31, 2, 0, tzinfo=timezone.utc)

@@ -307,15 +307,22 @@ def build_hypothesis_dashboard(
 def _true_ranges(candles: list[dict[str, Any]]) -> list[float]:
     ranges = []
     previous_close: float | None = None
+    previous_opened_at: datetime | None = None
     for candle in candles:
         high = float(candle["high"])
         low = float(candle["low"])
-        if previous_close is None:
+        opened_at = candle["opened_at"]
+        continuous = (
+            previous_opened_at is not None
+            and opened_at - previous_opened_at == timedelta(minutes=1)
+        )
+        if previous_close is None or not continuous:
             value = high - low
         else:
             value = max(high - low, abs(high - previous_close), abs(low - previous_close))
         ranges.append(value)
         previous_close = float(candle["close"])
+        previous_opened_at = opened_at
     return ranges
 
 

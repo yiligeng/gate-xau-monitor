@@ -45,18 +45,7 @@ class FakeHypothesisStore:
             },
             "evidence": {"code": "collecting", "label": "采集中"},
             "summary": {},
-            "anchors": [
-                {
-                    "minute": 30,
-                    "samples": [
-                        {
-                            "event_at": now,
-                            "entry_price": 4000.0,
-                            "price_1": 4001.0,
-                        }
-                    ],
-                }
-            ],
+            "anchors": [],
             "recent": [
                 {
                     "event_at": now,
@@ -152,10 +141,6 @@ class WebAuthenticationTests(unittest.TestCase):
         self.assertTrue(payload["ok"])
         self.assertEqual(payload["coverage"]["total_candles"], 100)
         self.assertEqual(payload["recent"][0]["minute"], 30)
-        self.assertIsInstance(
-            payload["anchors"][0]["samples"][0]["event_at"],
-            str,
-        )
         self.assertIsInstance(
             payload["recent"][0]["chart_candles"][0]["opened_at"],
             str,

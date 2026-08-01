@@ -74,6 +74,13 @@ select { font: inherit; }
   font-weight: 700;
 }
 
+.brand-mark.btc {
+  border-color: #226977;
+  color: #8ee7f2;
+  background: #102125;
+  font-family: inherit;
+}
+
 .research-brand small,
 .research-brand strong { display: block; }
 .research-brand small { color: var(--muted); font-size: 10px; }
@@ -386,7 +393,12 @@ tbody tr:hover td { background: #15191b; }
   }
   .research-brand { grid-column: 1 / -1; grid-row: 1; justify-self: center; }
   .back-link { grid-row: 1; z-index: 1; }
-  .research-actions { grid-column: 1 / -1; width: 100%; justify-content: flex-end; }
+  .research-actions {
+    grid-column: 1 / -1;
+    width: 100%;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
   .research-shell { width: min(100% - 24px, 1440px); padding-top: 20px; }
   .hypothesis-intro { align-items: stretch; flex-direction: column; }
   h1 { font-size: 27px; }

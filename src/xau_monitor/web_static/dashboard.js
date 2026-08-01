@@ -2727,6 +2727,7 @@ if (scalpToggle) {
 
 function applyMarketUi() {
   const config = MARKET_CONFIGS[activeMarket];
+  $("hypothesis-link").href = `/hypotheses?market=${activeMarket}`;
   setText("brand-mark", config.mark);
   $("brand-mark").classList.toggle("btc", activeMarket === "btc");
   setText("brand-eyebrow", config.eyebrow);

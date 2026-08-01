@@ -1,5 +1,28 @@
 const $ = (id) => document.getElementById(id);
 
+const ACTIVE_MARKET_KEY = "xau-monitor-active-market-v1";
+const MARKET_CONFIGS = {
+  xau: {
+    symbol: "XAUUSD",
+    mark: "Au",
+    name: "黄金",
+    title: "XAUUSD 黄金",
+    source: "Gate XAUUSD CFD",
+  },
+  btc: {
+    symbol: "BTCUSDT",
+    mark: "₿",
+    name: "BTC",
+    title: "BTCUSDT 永续",
+    source: "Gate BTC_USDT 永续合约",
+  },
+};
+const requestedMarket = new URLSearchParams(window.location.search).get("market");
+let activeMarket = MARKET_CONFIGS[requestedMarket]
+  ? requestedMarket
+  : localStorage.getItem(ACTIVE_MARKET_KEY) === "btc" ? "btc" : "xau";
+let requestSequence = 0;
+
 const CLASSIFICATION_LABELS = {
   persistent: "持续反转",
   faded: "假反转",
@@ -86,6 +109,33 @@ function setBar(id, value) {
   if (!target) return;
   const width = Number.isFinite(value) ? Math.max(0, Math.min(100, value)) : 0;
   target.style.width = `${width}%`;
+}
+
+function applyMarketUi() {
+  const config = MARKET_CONFIGS[activeMarket];
+  document.title = `策略猜想 · ${config.title}`;
+  $("market-filter").value = activeMarket;
+  $("research-brand-mark").textContent = config.mark;
+  $("research-brand-mark").classList.toggle("btc", activeMarket === "btc");
+  setText("research-brand-source", `GATE · ${config.symbol} · RESEARCH`);
+  setText("research-brand-title", `${config.name}策略猜想`);
+  setText("hypothesis-kicker", `HYP-REV-1M-V1 · ${config.symbol} · ASIA/SHANGHAI`);
+  setText("hypothesis-title", `${config.name}一分钟冲击后的时点反转`);
+  setText(
+    "research-note",
+    `本页只验证${config.name}固定时间规律，不会下单。最新样本必须完整走满15分钟后才进入统计；结果使用${config.source}一分钟K线，不含真实成交点差、滑点和手续费。`,
+  );
+}
+
+function switchMarket(nextMarket) {
+  if (!MARKET_CONFIGS[nextMarket] || nextMarket === activeMarket) return;
+  activeMarket = nextMarket;
+  localStorage.setItem(ACTIVE_MARKET_KEY, activeMarket);
+  const url = new URL(window.location.href);
+  url.searchParams.set("market", activeMarket);
+  window.history.replaceState({}, "", url);
+  applyMarketUi();
+  loadData();
 }
 
 function renderEvidence(data) {
@@ -356,11 +406,14 @@ function render(data) {
 }
 
 async function loadData() {
+  const requestId = ++requestSequence;
+  const requestedMarketId = activeMarket;
   const refresh = $("refresh-button");
   refresh.disabled = true;
   const days = $("days-filter").value;
   try {
-    const response = await fetch(`/api/hypotheses/reversal?market=xau&days=${days}`, {
+    const query = new URLSearchParams({ market: requestedMarketId, days });
+    const response = await fetch(`/api/hypotheses/reversal?${query}`, {
       cache: "no-store",
       credentials: "same-origin",
     });
@@ -369,20 +422,28 @@ async function loadData() {
       return;
     }
     const data = await response.json();
+    if (requestId !== requestSequence) return;
     if (!response.ok || !data.ok) {
       throw new Error(data.error || "统计读取失败");
     }
+    if (data.market !== requestedMarketId) {
+      throw new Error("统计品种与当前选择不一致");
+    }
     render(data);
   } catch (error) {
+    if (requestId !== requestSequence) return;
     const status = $("evidence-status");
     status.className = "evidence-status not_supported";
     status.querySelector("strong").textContent = "读取失败";
     setText("evidence-note", error.message || "请稍后重试");
   } finally {
-    refresh.disabled = false;
+    if (requestId === requestSequence) refresh.disabled = false;
   }
 }
 
 $("days-filter").addEventListener("change", loadData);
+$("market-filter").addEventListener("change", (event) => switchMarket(event.target.value));
 $("refresh-button").addEventListener("click", loadData);
+localStorage.setItem(ACTIVE_MARKET_KEY, activeMarket);
+applyMarketUi();
 loadData();

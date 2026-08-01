@@ -71,7 +71,7 @@ class WebAuthenticationTests(unittest.TestCase):
         self.server = DashboardServer(
             ("127.0.0.1", 0),
             make_handler(
-                {"xau": object()},
+                {"xau": object(), "btc": object()},
                 self.auth_store,
                 hypothesis_store=self.hypothesis_store,
             ),
@@ -145,6 +145,16 @@ class WebAuthenticationTests(unittest.TestCase):
             payload["recent"][0]["chart_candles"][0]["opened_at"],
             str,
         )
+
+        self.connection.request(
+            "GET",
+            "/api/hypotheses/reversal?market=btc&days=30",
+            headers=headers,
+        )
+        btc_response = self.connection.getresponse()
+        btc_payload = json.loads(btc_response.read())
+        self.assertEqual(btc_response.status, 200)
+        self.assertEqual(btc_payload["market"], "btc")
 
     def test_login_sets_host_only_secure_session_cookie(self) -> None:
         body = json.dumps(

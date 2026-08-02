@@ -163,13 +163,18 @@ function renderSummary(data) {
   setText("record-15", `${selected.reversal_15 || 0} / ${selected.sample_count || 0}`);
   setText("persistent-rate", rate(selected.persistent_rate));
   setText("persistent-count", `${selected.persistent || 0} 次持续反转`);
+  setText("lift-1", signed(data.summary?.lift_1, "pp"));
   setText("lift-5", signed(data.summary?.lift_5, "pp"));
   setText("lift-15", signed(data.summary?.lift_15, "pp"));
 
+  setBar("selected-bar-1", selected.reversal_rate_1);
+  setBar("control-bar-1", control.reversal_rate_1);
   setBar("selected-bar-5", selected.reversal_rate_5);
   setBar("control-bar-5", control.reversal_rate_5);
   setBar("selected-bar-15", selected.reversal_rate_15);
   setBar("control-bar-15", control.reversal_rate_15);
+  setText("selected-label-1", rate(selected.reversal_rate_1));
+  setText("control-label-1", rate(control.reversal_rate_1));
   setText("selected-label-5", rate(selected.reversal_rate_5));
   setText("control-label-5", rate(control.reversal_rate_5));
   setText("selected-label-15", rate(selected.reversal_rate_15));

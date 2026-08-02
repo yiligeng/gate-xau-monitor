@@ -109,6 +109,7 @@ class ReversalHypothesisTests(unittest.TestCase):
         self.assertEqual(selected["reversal_5"], 1)
         self.assertEqual(selected["reversal_15"], 1)
         self.assertEqual(selected["persistent"], 1)
+        self.assertIn("lift_1", result["summary"])
         self.assertEqual(result["recent"][0]["minute"], 30)
         self.assertEqual(result["recent"][0]["trade_direction"], "short")
         self.assertEqual(result["recent"][0]["classification"], "persistent")

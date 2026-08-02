@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0b0d0f">
     <title>策略猜想 · XAUUSD 黄金</title>
     <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="stylesheet" href="/hypotheses.css?v=11">
+    <link rel="stylesheet" href="/hypotheses.css?v=12">
   </head>
   <body>
     <header class="research-topbar">
@@ -89,6 +89,11 @@
           <small id="persistent-count">5分与15分均成立</small>
         </article>
         <article class="metric-card comparison">
+          <span>1分钟超额</span>
+          <strong id="lift-1">--</strong>
+          <small>相对12/18/42/48</small>
+        </article>
+        <article class="metric-card comparison">
           <span>5分钟超额</span>
           <strong id="lift-5">--</strong>
           <small>相对12/18/42/48</small>
@@ -109,6 +114,13 @@
           <small>对照分钟：12、18、42、48</small>
         </div>
         <div class="comparison-rows">
+          <div class="comparison-row">
+            <span>1分钟</span>
+            <div class="bar-track"><i id="selected-bar-1" class="selected-bar"></i></div>
+            <strong id="selected-label-1">--</strong>
+            <div class="bar-track"><i id="control-bar-1" class="control-bar"></i></div>
+            <strong id="control-label-1">--</strong>
+          </div>
           <div class="comparison-row">
             <span>5分钟</span>
             <div class="bar-track"><i id="selected-bar-5" class="selected-bar"></i></div>
@@ -182,6 +194,6 @@
         结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
       </p>
     </main>
-    <script src="/hypotheses.js?v=11"></script>
+    <script src="/hypotheses.js?v=12"></script>
   </body>
 </html>

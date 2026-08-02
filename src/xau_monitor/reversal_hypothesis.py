@@ -296,6 +296,7 @@ def build_hypothesis_dashboard(
             "selected": selected_summary,
             "grid_control": grid_summary,
             "other_control": other_summary,
+            "lift_1": _rate_lift(selected_summary, grid_summary, "reversal_rate_1"),
             "lift_5": _rate_lift(selected_summary, grid_summary, "reversal_rate_5"),
             "lift_15": _rate_lift(selected_summary, grid_summary, "reversal_rate_15"),
         },

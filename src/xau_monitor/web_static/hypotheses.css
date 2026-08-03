@@ -181,6 +181,9 @@ h2 { font-size: 19px; }
 
 .plain-language-rule strong { color: var(--gold-soft); }
 .plain-language-rule span { line-height: 1.6; }
+.plain-language-rule .formula-copy { display: grid; gap: 2px; }
+.plain-language-rule .formula-copy b { color: var(--text); font-weight: 600; }
+.plain-language-rule .formula-copy em { color: var(--muted); font-size: 12px; font-style: normal; }
 .plain-language-rule small {
   grid-column: 2;
   color: var(--muted);

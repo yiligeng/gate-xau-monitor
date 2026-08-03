@@ -246,6 +246,7 @@ const defaultIndicators = {
   atr: false,
   psar: true,
   pivots: true,
+  hypothesis: true,
 };
 let strategyEnabled = true;
 let enabledIndicators = { ...defaultIndicators };
@@ -1977,6 +1978,128 @@ function atrSeries(candles, period = 14) {
   return output;
 }
 
+const HYPOTHESIS_ANCHOR_MINUTES = [0, 6, 24, 30, 36, 54];
+const HYPOTHESIS_SIGNAL_MINUTES = HYPOTHESIS_ANCHOR_MINUTES
+  .map((minute) => (minute + 59) % 60)
+  .sort((left, right) => left - right);
+
+function hypothesisAtr(candles, period = 14) {
+  if (candles.length < period + 1) return null;
+  const startIndex = candles.length - period;
+  const window = candles.slice(startIndex);
+  if (window.some((candle, index) => (
+    index > 0 && candle.timestamp - window[index - 1].timestamp !== 60
+  ))) return null;
+  if (candles[startIndex].timestamp - candles[startIndex - 1].timestamp !== 60) return null;
+  const ranges = window.map((candle, index) => {
+    const previous = index === 0 ? candles[startIndex - 1] : window[index - 1];
+    return Math.max(
+      candle.high - candle.low,
+      Math.abs(candle.high - previous.close),
+      Math.abs(candle.low - previous.close),
+    );
+  });
+  return ranges.reduce((sum, value) => sum + value, 0) / period;
+}
+
+function setHypothesisCondition(id, state) {
+  const target = $(id);
+  target.classList.remove("pass", "fail", "pending");
+  target.classList.add(state);
+}
+
+function nextHypothesisSignalMinute(currentMinute) {
+  return HYPOTHESIS_SIGNAL_MINUTES.find((minute) => minute > currentMinute)
+    ?? HYPOTHESIS_SIGNAL_MINUTES[0];
+}
+
+function renderHypothesisSignal(data) {
+  const panel = $("hypothesis-live");
+  const enabled = strategyEnabled && enabledIndicators.hypothesis;
+  panel.hidden = !enabled;
+  if (!enabled) return;
+
+  const ticker = data?.ticker;
+  const tickerTimestamp = Number(ticker?.timestamp_ms);
+  const candles = mergeLiveCandle(data?.candles?.["1m"] || [], data?.ticks || [], 60);
+  const current = candles.at(-1);
+  if (!current || !Number.isFinite(tickerTimestamp)) {
+    panel.className = "hypothesis-live waiting";
+    setText("hypothesis-live-state", "等待一分钟行情");
+    setText("hypothesis-live-score", "0 / 3");
+    return;
+  }
+
+  const quoteDate = new Date(tickerTimestamp);
+  const minute = quoteDate.getUTCMinutes();
+  const second = quoteDate.getUTCSeconds();
+  const anchorMinute = HYPOTHESIS_ANCHOR_MINUTES.find(
+    (anchor) => (anchor + 59) % 60 === minute,
+  );
+  const timePass = Number.isFinite(anchorMinute);
+  const atr = hypothesisAtr(candles);
+  const body = Math.abs(Number(current.close) - Number(current.open));
+  const fullRange = Number(current.high) - Number(current.low);
+  const distanceThreshold = Number.isFinite(atr) ? atr * 0.25 : null;
+  const bodyRatio = fullRange > 0 ? body / fullRange : 0;
+  const distancePass = Number.isFinite(distanceThreshold) && body >= distanceThreshold;
+  const cleanPass = bodyRatio >= 0.60;
+  const passed = [timePass, distancePass, cleanPass].filter(Boolean).length;
+  const hit = passed === 3;
+  const signalDirection = Number(current.close) >= Number(current.open) ? "上涨" : "下跌";
+  const tradeDirection = signalDirection === "上涨" ? "准备做空" : "准备做多";
+  const marketClosed = String(ticker?.status || "").toLowerCase() === "closed";
+
+  panel.className = `hypothesis-live ${hit && !marketClosed ? "hit" : "waiting"}`;
+  setText(
+    "hypothesis-live-state",
+    marketClosed
+      ? "市场休市"
+      : hit
+        ? `暂时命中 · ${tradeDirection}`
+        : timePass
+          ? `本分钟计算中 · ${signalDirection}`
+          : "等待观察前1分钟",
+  );
+  setText("hypothesis-live-score", marketClosed ? "--" : `${passed} / 3`);
+
+  setHypothesisCondition("hypothesis-time-condition", timePass ? "pass" : "pending");
+  if (timePass) {
+    setText("hypothesis-time-value", `${String(minute).padStart(2, "0")}分 → ${String(anchorMinute).padStart(2, "0")}分观察`);
+    setText("hypothesis-time-note", `距本分钟收盘 ${Math.max(1, 60 - second)}秒`);
+  } else {
+    const nextSignal = nextHypothesisSignalMinute(minute);
+    const nextAnchor = (nextSignal + 1) % 60;
+    setText("hypothesis-time-value", `当前 ${String(minute).padStart(2, "0")}分`);
+    setText("hypothesis-time-note", `等待 ${String(nextSignal).padStart(2, "0")}分 → ${String(nextAnchor).padStart(2, "0")}分观察`);
+  }
+
+  setHypothesisCondition(
+    "hypothesis-distance-condition",
+    Number.isFinite(distanceThreshold) ? (distancePass ? "pass" : "fail") : "pending",
+  );
+  setText(
+    "hypothesis-distance-value",
+    Number.isFinite(distanceThreshold)
+      ? `实体 $${body.toFixed(2)} / 门槛 $${distanceThreshold.toFixed(2)}`
+      : "ATR数据不足",
+  );
+  setText(
+    "hypothesis-distance-note",
+    Number.isFinite(atr) ? `ATR(14) $${atr.toFixed(2)} × 25%` : "需要连续15根1分钟K线",
+  );
+
+  setHypothesisCondition("hypothesis-clean-condition", cleanPass ? "pass" : "fail");
+  setText("hypothesis-clean-value", `实体占比 ${(bodyRatio * 100).toFixed(1)}% / 门槛 60%`);
+  setText("hypothesis-clean-note", `实体 $${body.toFixed(2)} ÷ 总波动 $${Math.max(0, fullRange).toFixed(2)}`);
+  setText(
+    "hypothesis-live-note",
+    hit && !marketClosed
+      ? `当前三项都满足，${tradeDirection}。这是盘中暂时结果，收盘后才最终进入统计。`
+      : "盘中结果每秒更新；最后一秒仍可能改变，收盘后才最终进入统计。",
+  );
+}
+
 function atrChannelSeries(candles, period = 20, multiplier = 2) {
   const closes = candles.map((candle) => candle.close);
   const middle = emaSeries(closes, period);
@@ -2586,6 +2709,7 @@ function drawSelectedChart(data, force = false) {
 function redrawChartAndCalendar(data, force = true) {
   drawSelectedChart(data, force);
   renderMarketCalendar(data.market_calendar, chartFocusMs);
+  renderHypothesisSignal(data);
 }
 
 function render(data) {
@@ -2634,6 +2758,7 @@ function render(data) {
   renderMarketCalendar(data.market_calendar, chartFocusMs);
   renderScalpStrategy(data);
   drawSelectedChart(data);
+  renderHypothesisSignal(data);
 
   renderKeyLevelViews(data);
 }
@@ -2873,7 +2998,7 @@ function startMarketUpdates() {
   if (snapshotTimer || quoteTimer) return;
   refresh();
   refreshBotAlerts("");
-  quoteTimer = window.setInterval(refreshQuote, 2000);
+  quoteTimer = window.setInterval(refreshQuote, 1000);
   snapshotTimer = window.setInterval(refresh, 15000);
   botAlertsTimer = window.setInterval(() => refreshBotAlerts(), 15000);
 }

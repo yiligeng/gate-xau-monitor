@@ -105,6 +105,12 @@ class WebAuthenticationTests(unittest.TestCase):
         self.assertEqual(dashboard_response.getheader("Location"), "/login")
         dashboard_response.read()
 
+        headers = {"Cookie": "__Host-sheshe_session=valid-session"}
+        self.connection.request("GET", "/", headers=headers)
+        dashboard_response = self.connection.getresponse()
+        self.assertEqual(dashboard_response.status, 200)
+        self.assertIn("猜想实时条件", dashboard_response.read().decode("utf-8"))
+
     def test_market_api_requires_session(self) -> None:
         for path in (
             "/api/snapshot?market=btc",

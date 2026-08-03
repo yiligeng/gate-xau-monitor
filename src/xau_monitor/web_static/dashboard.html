@@ -8,7 +8,7 @@
     <title>黄金 CFD / BTC 永续行情监控</title>
     <link rel="icon" type="image/png" href="/favicon.png">
     <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-    <link rel="stylesheet" href="/dashboard.css?v=36">
+    <link rel="stylesheet" href="/dashboard.css?v=37">
   </head>
   <body>
     <main class="shell">
@@ -138,8 +138,34 @@
             <label><input type="checkbox" data-indicator="atr"><i class="indicator-color atr"></i>ATR通道</label>
             <label><input type="checkbox" data-indicator="psar" checked><i class="indicator-color psar"></i>PSAR</label>
             <label><input type="checkbox" data-indicator="pivots" checked><i class="indicator-color pivots"></i>日枢轴</label>
+            <label><input type="checkbox" data-indicator="hypothesis" checked><i class="indicator-color hypothesis"></i>猜想条件</label>
           </div>
           <p id="strategy-detail" class="strategy-detail">等待足够行情数据计算组合方向。</p>
+          <div id="hypothesis-live" class="hypothesis-live waiting" aria-live="polite">
+            <div class="hypothesis-live-head">
+              <strong>猜想实时条件</strong>
+              <span id="hypothesis-live-state">等待行情</span>
+              <b id="hypothesis-live-score">0 / 3</b>
+            </div>
+            <div class="hypothesis-condition-grid">
+              <div id="hypothesis-time-condition" class="hypothesis-condition pending">
+                <span>1 · 观察前1分钟</span>
+                <strong id="hypothesis-time-value">--</strong>
+                <small id="hypothesis-time-note">00 / 06 / 24 / 30 / 36 / 54分</small>
+              </div>
+              <div id="hypothesis-distance-condition" class="hypothesis-condition pending">
+                <span>2 · 走得够远</span>
+                <strong id="hypothesis-distance-value">--</strong>
+                <small id="hypothesis-distance-note">实体 ≥ ATR(14) × 25%</small>
+              </div>
+              <div id="hypothesis-clean-condition" class="hypothesis-condition pending">
+                <span>3 · 方向够干净</span>
+                <strong id="hypothesis-clean-value">--</strong>
+                <small id="hypothesis-clean-note">实体占比 ≥ 60%</small>
+              </div>
+            </div>
+            <p id="hypothesis-live-note">盘中结果每秒更新；最后一秒仍可能改变，收盘后才最终进入统计。</p>
+          </div>
         </div>
         <div class="chart-wrap">
           <canvas id="price-chart" aria-label="XAUUSD实时行情图"></canvas>
@@ -558,6 +584,6 @@
       <code id="strategy-help-formula"></code>
       <a id="strategy-help-link" class="help-link" href="#" rel="noopener noreferrer" hidden>查看来源</a>
     </div>
-    <script src="/dashboard.js?v=40"></script>
+    <script src="/dashboard.js?v=41"></script>
   </body>
 </html>

@@ -2098,7 +2098,7 @@ function renderHypothesisSignal(data) {
     hit && !marketClosed
       ? `当前三项都满足，${tradeDirection}。这是盘中暂时结果，收盘后才最终进入统计。`
       : activeMarket === "xau"
-        ? "黄金最高每秒4次更新；最后一秒仍可能改变，收盘后才最终进入统计。"
+        ? "黄金约每秒3次更新；最后一秒仍可能改变，收盘后才最终进入统计。"
         : "BTC每秒更新；最后一秒仍可能改变，收盘后才最终进入统计。",
   );
 }
@@ -3004,7 +3004,7 @@ function startMarketUpdates() {
   if (snapshotTimer || quoteTimer) return;
   refresh();
   refreshBotAlerts("");
-  quoteTimer = window.setInterval(refreshQuote, activeMarket === "xau" ? 250 : 1000);
+  quoteTimer = window.setInterval(refreshQuote, activeMarket === "xau" ? 333 : 1000);
   snapshotTimer = window.setInterval(refresh, 15000);
   botAlertsTimer = window.setInterval(() => refreshBotAlerts(), 15000);
 }

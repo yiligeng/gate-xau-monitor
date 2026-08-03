@@ -81,7 +81,9 @@ def main() -> None:
             code = run_web_server(
                 client=client,
                 symbol=args.symbol.upper(),
-                quote_interval=args.quote_interval,
+                # Production also runs the bot on the same IP. Keep the web
+                # reader near 3 Hz so both stay below TradFi ticker's 5 r/s.
+                quote_interval=max(args.quote_interval, 1 / 3),
                 analysis_interval=args.analysis_interval,
                 host=args.host,
                 port=args.port,
@@ -94,7 +96,7 @@ def main() -> None:
             code = run_wecom_bot_service(
                 client=client,
                 symbol=args.symbol.upper(),
-                quote_interval=args.quote_interval,
+                quote_interval=max(args.quote_interval, 1.0),
                 analysis_interval=args.analysis_interval,
             )
         else:

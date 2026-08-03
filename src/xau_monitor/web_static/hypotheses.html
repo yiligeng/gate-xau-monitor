@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0b0d0f">
     <title>策略猜想 · XAUUSD 黄金</title>
     <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="stylesheet" href="/hypotheses.css?v=12">
+    <link rel="stylesheet" href="/hypotheses.css?v=13">
   </head>
   <body>
     <header class="research-topbar">
@@ -42,10 +42,11 @@
       <section class="hypothesis-intro" aria-labelledby="hypothesis-title">
         <div>
           <p id="hypothesis-kicker">HYP-REV-1M-V1 · XAUUSD · ASIA/SHANGHAI</p>
-          <h1 id="hypothesis-title">黄金一分钟冲击后的时点反转</h1>
-          <div class="minute-sequence" aria-label="观察分钟">
-            <span>00</span><span>06</span><span>24</span>
-            <span>30</span><span>36</span><span>54</span>
+          <h1 id="hypothesis-title">黄金：前1分钟明显涨跌后，接下来会不会反转？</h1>
+          <p class="minute-caption">这些数字是“开始看反转”的时刻</p>
+          <div class="minute-sequence" aria-label="反转观察起点">
+            <span>00分</span><span>06分</span><span>24分</span>
+            <span>30分</span><span>36分</span><span>54分</span>
           </div>
         </div>
         <div id="evidence-status" class="evidence-status collecting">
@@ -55,11 +56,17 @@
         </div>
       </section>
 
+      <section class="plain-language-rule" aria-label="00分观察方法">
+        <strong>00分怎么看？</strong>
+        <span>先看 59:00→00:00 这一分钟是否明显上涨或下跌；再以 00:00 的价格为起点，看 00:01、00:05、00:15 时是否向反方向走。</span>
+        <small>06分同理：先看 05:00→06:00，再从 06:00 开始看反转。</small>
+      </section>
+
       <section class="rule-band" aria-label="固定验证规则">
-        <div><span>信号</span><strong>目标时点前1分钟完整K线</strong></div>
-        <div><span>有效冲击</span><strong>实体≥0.25 ATR · 实体占比≥60%</strong></div>
-        <div><span>结果</span><strong>目标时点后1分钟 / 5分钟 / 15分钟</strong></div>
-        <div><span>反转门槛</span><strong>反向变化≥0.30 ATR</strong></div>
+        <div><span>反转观察起点</span><strong>00 / 06 / 24 / 30 / 36 / 54分</strong></div>
+        <div><span>先看前1分钟</span><strong>00分看59:00→00:00；06分看05:00→06:00</strong></div>
+        <div><span>前1分钟合格标准</span><strong>实体≥0.25 ATR · 实体占比≥60%</strong></div>
+        <div><span>再看是否反转</span><strong>起点后1 / 5 / 15分钟反向变化≥0.30 ATR</strong></div>
       </section>
 
       <section class="metric-grid" aria-label="核心统计">
@@ -178,7 +185,7 @@
           <table class="audit-table">
             <thead>
               <tr>
-                <th>观察时点</th><th>观察前走势</th><th>观察起点</th>
+                <th>反转观察起点</th><th>起点前走势</th><th>起点价格</th>
                 <th>后1分钟</th><th>5分钟价格</th><th>15分钟价格</th><th>结果</th>
               </tr>
             </thead>
@@ -194,6 +201,6 @@
         结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
       </p>
     </main>
-    <script src="/hypotheses.js?v=12"></script>
+    <script src="/hypotheses.js?v=13"></script>
   </body>
 </html>

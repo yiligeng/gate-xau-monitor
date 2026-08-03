@@ -120,7 +120,7 @@ function applyMarketUi() {
   setText("research-brand-source", `GATE · ${config.symbol} · RESEARCH`);
   setText("research-brand-title", `${config.name}策略猜想`);
   setText("hypothesis-kicker", `HYP-REV-1M-V1 · ${config.symbol} · ASIA/SHANGHAI`);
-  setText("hypothesis-title", `${config.name}一分钟冲击后的时点反转`);
+  setText("hypothesis-title", `${config.name}：前1分钟明显涨跌后，接下来会不会反转？`);
   setText(
     "research-note",
     `本页只验证${config.name}固定时间规律，不会下单。最新样本必须完整走满15分钟后才进入统计；结果使用${config.source}一分钟K线，不含真实成交点差、滑点和手续费。`,
@@ -330,17 +330,17 @@ function renderAudit(rows) {
     const chartId = `sample-chart-${index}`;
     return `
       <tr class="sample-row">
-        <td class="audit-time" data-label="观察时点">
+        <td class="audit-time" data-label="反转观察起点">
           <strong>${escapeHtml(localTime(row.event_at))}</strong>
           <small>${String(row.minute).padStart(2, "0")}分</small>
         </td>
-        <td class="price-cell pre-move-cell" data-label="观察前走势">
+        <td class="price-cell pre-move-cell" data-label="起点前走势">
           <strong>${timeRange(row.event_at, -5, 0)}</strong>
           <small>前5分 ${price(row.pre_5_open_price)} → ${price(row.entry_price)}</small>
           <small>最高 ${price(row.pre_5_high)} · 最低 ${price(row.pre_5_low)}</small>
           <small>前1分 ${price(row.signal_open_price)} → ${price(row.signal_close_price)} · ${signal} ${Number(row.signal_body_atr || 0).toFixed(2)} ATR</small>
         </td>
-        <td class="price-cell" data-label="观察起点">
+        <td class="price-cell" data-label="起点价格">
           <strong>${price(row.entry_price)}</strong>
           <small>${timeOnly(row.event_at)} · ${direction}</small>
           <small>ATR $${Number(row.atr || 0).toFixed(2)}</small>

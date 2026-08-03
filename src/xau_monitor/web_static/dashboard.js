@@ -2065,13 +2065,14 @@ function renderHypothesisSignal(data) {
   setText("hypothesis-live-score", marketClosed ? "--" : `${passed} / 3`);
 
   setHypothesisCondition("hypothesis-time-condition", timePass ? "pass" : "pending");
+  const minuteSecond = `${String(minute).padStart(2, "0")}:${String(second).padStart(2, "0")}`;
   if (timePass) {
-    setText("hypothesis-time-value", `${String(minute).padStart(2, "0")}分 → ${String(anchorMinute).padStart(2, "0")}分观察`);
+    setText("hypothesis-time-value", `当前 ${minuteSecond} → ${String(anchorMinute).padStart(2, "0")}分观察`);
     setText("hypothesis-time-note", `距本分钟收盘 ${Math.max(1, 60 - second)}秒`);
   } else {
     const nextSignal = nextHypothesisSignalMinute(minute);
     const nextAnchor = (nextSignal + 1) % 60;
-    setText("hypothesis-time-value", `当前 ${String(minute).padStart(2, "0")}分`);
+    setText("hypothesis-time-value", `当前 ${minuteSecond}`);
     setText("hypothesis-time-note", `等待 ${String(nextSignal).padStart(2, "0")}分 → ${String(nextAnchor).padStart(2, "0")}分观察`);
   }
 

@@ -184,6 +184,20 @@ def build_hypothesis_dashboard(
             and body_abs >= SIGNAL_ATR_RATIO * atr
             and body_ratio >= SIGNAL_BODY_RATIO
         )
+        if atr <= 0:
+            qualification_reason = "ATR不可用，未进入统计"
+        elif body_abs < SIGNAL_ATR_RATIO * atr:
+            qualification_reason = (
+                f"前1分钟波动仅 {body_abs / atr:.2f} ATR，"
+                f"需≥{SIGNAL_ATR_RATIO:.2f} ATR"
+            )
+        elif body_ratio < SIGNAL_BODY_RATIO:
+            qualification_reason = (
+                f"实体占整根K线 {body_ratio * 100:.0f}%，"
+                f"需≥{SIGNAL_BODY_RATIO * 100:.0f}%"
+            )
+        else:
+            qualification_reason = "已达到有效冲击门槛"
         signal_direction = 1 if body > 0 else -1 if body < 0 else 0
         entry = float(signal["close"])
         counter_return_1 = -signal_direction * (float(future_1["close"]) - entry)
@@ -229,6 +243,7 @@ def build_hypothesis_dashboard(
                 "signal_body_ratio": body_ratio,
                 "atr": atr,
                 "qualified": qualified,
+                "qualification_reason": qualification_reason,
                 "return_1": counter_return_1,
                 "return_5": counter_return_5,
                 "return_15": counter_return_15,
@@ -275,7 +290,6 @@ def build_hypothesis_dashboard(
     recent = [
         _serialize_event(event)
         for event in reversed(selected)
-        if event["qualified"]
     ][:RECENT_AUDIT_LIMIT]
     status = _evidence_status(selected_summary, grid_summary)
     return {
@@ -506,5 +520,5 @@ def _serialize_event(event: dict[str, Any]) -> dict[str, Any]:
     return {
         key: value
         for key, value in event.items()
-        if key not in {"qualified", "group"}
+        if key != "group"
     }

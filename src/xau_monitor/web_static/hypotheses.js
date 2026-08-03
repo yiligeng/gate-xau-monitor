@@ -317,16 +317,20 @@ function renderCandleChart(row) {
   `;
 }
 
-function renderAudit(rows, emptyMessage = "还没有走满15分钟的有效样本。") {
+function renderAudit(rows, emptyMessage = "还没有走满15分钟的观察记录。") {
   const target = $("audit-body");
   if (!rows?.length) {
     target.innerHTML = `<tr><td class="empty-row" colspan="7">${escapeHtml(emptyMessage)}</td></tr>`;
     return;
   }
   target.innerHTML = rows.map((row, index) => {
-    const direction = row.trade_direction === "long" ? "准备做多" : "准备做空";
+    const direction = row.qualified
+      ? row.trade_direction === "long" ? "准备做多" : "准备做空"
+      : "未进入统计";
     const signal = row.signal_direction === "up" ? "上涨" : "下跌";
-    const oneMinuteState = row.reversal_1
+    const oneMinuteState = !row.qualified
+      ? "不统计"
+      : row.reversal_1
       ? "已反转"
       : Number(row.return_1 || 0) > 0
         ? "反向但未达标"
@@ -369,7 +373,10 @@ function renderAudit(rows, emptyMessage = "还没有走满15分钟的有效样�
           <small class="outcome-line ${resultClass(row.return_15)}">${money(row.return_15)} / ${signed(row.return_15_atr, " ATR")}</small>
         </td>
         <td class="result-cell" data-label="结果">
-          <strong>${escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)}</strong>
+          <strong>${row.qualified
+            ? escapeHtml(CLASSIFICATION_LABELS[row.classification] || row.classification)
+            : "未达有效冲击"}</strong>
+          <small>${escapeHtml(row.qualification_reason || "")}</small>
           <button class="chart-toggle" type="button" data-chart-id="${chartId}" data-row-index="${index}" aria-expanded="false">查看K线</button>
         </td>
       </tr>
@@ -395,6 +402,7 @@ function renderAudit(rows, emptyMessage = "还没有走满15分钟的有效样�
 }
 
 function auditResultMatches(row, result) {
+  if (!row.qualified && result !== "all") return false;
   if (result === "reversal_1") return Boolean(row.reversal_1);
   if (result === "reversal_5") return Boolean(row.reversal_5);
   if (result === "reversal_15") return Boolean(row.reversal_15);
@@ -404,11 +412,13 @@ function auditResultMatches(row, result) {
 }
 
 function applyAuditFilters() {
+  const scope = $("audit-scope-filter").value;
   const minute = $("audit-minute-filter").value;
   const direction = $("audit-direction-filter").value;
   const result = $("audit-result-filter").value;
   const filtered = latestAuditRows.filter((row) => (
-    (minute === "all" || Number(row.minute) === Number(minute))
+    (scope === "all" || (scope === "qualified") === Boolean(row.qualified))
+    && (minute === "all" || Number(row.minute) === Number(minute))
     && (direction === "all" || row.signal_direction === direction)
     && auditResultMatches(row, result)
   ));
@@ -480,10 +490,12 @@ async function loadData() {
 $("days-filter").addEventListener("change", loadData);
 $("market-filter").addEventListener("change", (event) => switchMarket(event.target.value));
 $("refresh-button").addEventListener("click", loadData);
+$("audit-scope-filter").addEventListener("change", applyAuditFilters);
 $("audit-minute-filter").addEventListener("change", applyAuditFilters);
 $("audit-direction-filter").addEventListener("change", applyAuditFilters);
 $("audit-result-filter").addEventListener("change", applyAuditFilters);
 $("audit-filter-reset").addEventListener("click", () => {
+  $("audit-scope-filter").value = "qualified";
   $("audit-minute-filter").value = "all";
   $("audit-direction-filter").value = "all";
   $("audit-result-filter").value = "all";

@@ -177,11 +177,19 @@
         <div class="section-title">
           <div>
             <p>TRIAL AUDIT</p>
-            <h2 id="audit-title">最近有效样本</h2>
+            <h2 id="audit-title">最近观察记录</h2>
           </div>
           <small id="coverage-text">K线数据正在积累</small>
         </div>
-        <div class="audit-filters" aria-label="有效样本筛选">
+        <div class="audit-filters" aria-label="观察记录筛选">
+          <label>
+            <span>样本范围</span>
+            <select id="audit-scope-filter">
+              <option value="qualified">有效冲击</option>
+              <option value="all">全部观察点</option>
+              <option value="excluded">未达门槛</option>
+            </select>
+          </label>
           <label>
             <span>反转观察起点</span>
             <select id="audit-minute-filter">
@@ -225,7 +233,7 @@
               </tr>
             </thead>
             <tbody id="audit-body">
-              <tr><td class="empty-row" colspan="7">还没有走满15分钟的有效样本。</td></tr>
+              <tr><td class="empty-row" colspan="7">还没有走满15分钟的观察记录。</td></tr>
             </tbody>
           </table>
         </div>
@@ -236,6 +244,6 @@
         结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
       </p>
     </main>
-    <script src="/hypotheses.js?v=14"></script>
+    <script src="/hypotheses.js?v=15"></script>
   </body>
 </html>

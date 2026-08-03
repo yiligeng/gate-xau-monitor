@@ -379,7 +379,9 @@ tbody tr:hover td { background: #15191b; }
 .audit-time strong,
 .audit-time small,
 .price-cell strong,
-.price-cell small { display: block; }
+.price-cell small,
+.result-cell small { display: block; }
+.result-cell small { max-width: 210px; margin-top: 6px; color: var(--muted); white-space: normal; }
 .audit-time strong,
 .price-cell strong { color: var(--text); font-size: 14px; }
 .audit-time small,

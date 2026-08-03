@@ -18,6 +18,7 @@ SIGNAL_ATR_RATIO = 0.25
 SIGNAL_BODY_RATIO = 0.60
 REVERSAL_ATR_RATIO = 0.30
 ATR_PERIOD = 14
+RECENT_AUDIT_LIMIT = 240
 
 
 def utc_now() -> datetime:
@@ -275,7 +276,7 @@ def build_hypothesis_dashboard(
         _serialize_event(event)
         for event in reversed(selected)
         if event["qualified"]
-    ][:40]
+    ][:RECENT_AUDIT_LIMIT]
     status = _evidence_status(selected_summary, grid_summary)
     return {
         "strategy_version": STRATEGY_VERSION,

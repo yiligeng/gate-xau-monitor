@@ -22,6 +22,8 @@ let activeMarket = MARKET_CONFIGS[requestedMarket]
   ? requestedMarket
   : localStorage.getItem(ACTIVE_MARKET_KEY) === "btc" ? "btc" : "xau";
 let requestSequence = 0;
+let latestAuditRows = [];
+const AUDIT_DISPLAY_LIMIT = 40;
 
 const CLASSIFICATION_LABELS = {
   persistent: "持续反转",
@@ -134,7 +136,9 @@ function switchMarket(nextMarket) {
   const url = new URL(window.location.href);
   url.searchParams.set("market", activeMarket);
   window.history.replaceState({}, "", url);
+  latestAuditRows = [];
   applyMarketUi();
+  applyAuditFilters();
   loadData();
 }
 
@@ -313,10 +317,10 @@ function renderCandleChart(row) {
   `;
 }
 
-function renderAudit(rows) {
+function renderAudit(rows, emptyMessage = "还没有走满15分钟的有效样本。") {
   const target = $("audit-body");
   if (!rows?.length) {
-    target.innerHTML = '<tr><td class="empty-row" colspan="7">还没有走满15分钟的有效样本。</td></tr>';
+    target.innerHTML = `<tr><td class="empty-row" colspan="7">${escapeHtml(emptyMessage)}</td></tr>`;
     return;
   }
   target.innerHTML = rows.map((row, index) => {
@@ -390,6 +394,32 @@ function renderAudit(rows) {
   });
 }
 
+function auditResultMatches(row, result) {
+  if (result === "reversal_1") return Boolean(row.reversal_1);
+  if (result === "reversal_5") return Boolean(row.reversal_5);
+  if (result === "reversal_15") return Boolean(row.reversal_15);
+  if (result === "persistent") return Boolean(row.reversal_5 && row.reversal_15);
+  if (result === "none") return !row.reversal_1 && !row.reversal_5 && !row.reversal_15;
+  return true;
+}
+
+function applyAuditFilters() {
+  const minute = $("audit-minute-filter").value;
+  const direction = $("audit-direction-filter").value;
+  const result = $("audit-result-filter").value;
+  const filtered = latestAuditRows.filter((row) => (
+    (minute === "all" || Number(row.minute) === Number(minute))
+    && (direction === "all" || row.signal_direction === direction)
+    && auditResultMatches(row, result)
+  ));
+  const visible = filtered.slice(0, AUDIT_DISPLAY_LIMIT);
+  const countText = filtered.length > visible.length
+    ? `命中 ${filtered.length} 条 · 显示最近 ${visible.length} 条`
+    : `显示 ${visible.length} / ${latestAuditRows.length} 条`;
+  setText("audit-filter-count", countText);
+  renderAudit(visible, latestAuditRows.length ? "没有符合当前筛选的样本。" : undefined);
+}
+
 function renderCoverage(coverage) {
   const count = coverage?.total_candles || 0;
   if (!count) {
@@ -406,7 +436,8 @@ function render(data) {
   renderEvidence(data);
   renderSummary(data);
   renderAnchors(data.anchors);
-  renderAudit(data.recent);
+  latestAuditRows = Array.isArray(data.recent) ? data.recent : [];
+  applyAuditFilters();
   renderCoverage(data.coverage);
 }
 
@@ -449,6 +480,15 @@ async function loadData() {
 $("days-filter").addEventListener("change", loadData);
 $("market-filter").addEventListener("change", (event) => switchMarket(event.target.value));
 $("refresh-button").addEventListener("click", loadData);
+$("audit-minute-filter").addEventListener("change", applyAuditFilters);
+$("audit-direction-filter").addEventListener("change", applyAuditFilters);
+$("audit-result-filter").addEventListener("change", applyAuditFilters);
+$("audit-filter-reset").addEventListener("click", () => {
+  $("audit-minute-filter").value = "all";
+  $("audit-direction-filter").value = "all";
+  $("audit-result-filter").value = "all";
+  applyAuditFilters();
+});
 localStorage.setItem(ACTIVE_MARKET_KEY, activeMarket);
 applyMarketUi();
 loadData();

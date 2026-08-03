@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0b0d0f">
     <title>策略猜想 · XAUUSD 黄金</title>
     <link rel="icon" type="image/png" href="/favicon.png">
-    <link rel="stylesheet" href="/hypotheses.css?v=13">
+    <link rel="stylesheet" href="/hypotheses.css?v=14">
   </head>
   <body>
     <header class="research-topbar">
@@ -181,6 +181,41 @@
           </div>
           <small id="coverage-text">K线数据正在积累</small>
         </div>
+        <div class="audit-filters" aria-label="有效样本筛选">
+          <label>
+            <span>反转观察起点</span>
+            <select id="audit-minute-filter">
+              <option value="all">全部起点</option>
+              <option value="0">00分</option>
+              <option value="6">06分</option>
+              <option value="24">24分</option>
+              <option value="30">30分</option>
+              <option value="36">36分</option>
+              <option value="54">54分</option>
+            </select>
+          </label>
+          <label>
+            <span>起点前1分钟</span>
+            <select id="audit-direction-filter">
+              <option value="all">全部方向</option>
+              <option value="up">前1分钟上涨 · 看做空反转</option>
+              <option value="down">前1分钟下跌 · 看做多反转</option>
+            </select>
+          </label>
+          <label>
+            <span>反转结果</span>
+            <select id="audit-result-filter">
+              <option value="all">全部结果</option>
+              <option value="reversal_1">1分钟反转成功</option>
+              <option value="reversal_5">5分钟反转成功</option>
+              <option value="reversal_15">15分钟反转成功</option>
+              <option value="persistent">5分和15分都反转</option>
+              <option value="none">1/5/15分钟都未反转</option>
+            </select>
+          </label>
+          <button id="audit-filter-reset" type="button">重置筛选</button>
+          <strong id="audit-filter-count">显示 0 条</strong>
+        </div>
         <div class="table-wrap">
           <table class="audit-table">
             <thead>
@@ -201,6 +236,6 @@
         结果使用Gate XAUUSD CFD一分钟K线，不含真实成交点差、滑点和手续费。
       </p>
     </main>
-    <script src="/hypotheses.js?v=13"></script>
+    <script src="/hypotheses.js?v=14"></script>
   </body>
 </html>

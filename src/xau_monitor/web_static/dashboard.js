@@ -221,6 +221,7 @@ let lastChartSignature = "";
 let chartMode = "1m";
 let chartFocusMs = null;
 let quoteTimer = null;
+let quoteRefreshInFlight = false;
 let snapshotTimer = null;
 let botAlertsTimer = null;
 let botSelectedChatId = "";
@@ -2096,7 +2097,9 @@ function renderHypothesisSignal(data) {
     "hypothesis-live-note",
     hit && !marketClosed
       ? `当前三项都满足，${tradeDirection}。这是盘中暂时结果，收盘后才最终进入统计。`
-      : "盘中结果每秒更新；最后一秒仍可能改变，收盘后才最终进入统计。",
+      : activeMarket === "xau"
+        ? "黄金最高每秒4次更新；最后一秒仍可能改变，收盘后才最终进入统计。"
+        : "BTC每秒更新；最后一秒仍可能改变，收盘后才最终进入统计。",
   );
 }
 
@@ -2808,7 +2811,8 @@ async function refresh() {
 }
 
 async function refreshQuote() {
-  if (!latestPayload) return;
+  if (!latestPayload || quoteRefreshInFlight) return;
+  quoteRefreshInFlight = true;
   const requestedMarket = activeMarket;
   try {
     const response = await authorizedFetch(`/api/quote?market=${requestedMarket}`);
@@ -2823,6 +2827,8 @@ async function refreshQuote() {
   } catch (error) {
     setText("market-status", "报价重试中");
     setText("alert-line", error.message);
+  } finally {
+    quoteRefreshInFlight = false;
   }
 }
 
@@ -2998,7 +3004,7 @@ function startMarketUpdates() {
   if (snapshotTimer || quoteTimer) return;
   refresh();
   refreshBotAlerts("");
-  quoteTimer = window.setInterval(refreshQuote, 1000);
+  quoteTimer = window.setInterval(refreshQuote, activeMarket === "xau" ? 250 : 1000);
   snapshotTimer = window.setInterval(refresh, 15000);
   botAlertsTimer = window.setInterval(() => refreshBotAlerts(), 15000);
 }
